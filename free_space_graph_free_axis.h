@@ -195,21 +195,27 @@ public:
         this->left_column = pathlet.first;
         this->right_column  = pathlet.second;
         vertex* end_vertex = nullptr;
-        assert(start_vertex != nullptr);
+        //If start_vertex == nullptr it means that theright extreme of tehe pathlet is not close enough to any point in the sample -> we count 0
+        if(start_vertex ==nullptr){
+
+            return counter;
+        }
+
+
         bool success = false;
         id_t current_visiting_trajectory = sample.get_id_at(start_vertex->row_index);
         id_t last_trajectory_to_be_visited = sample.get_id_at(sample.total_size()-1);
-        std::cout<<"Started visiting trajectory "<< current_visiting_trajectory<<std::endl;
-        std::cout<<"Last trajectory "<< last_trajectory_to_be_visited<<std::endl;
+        //std::cout<<"Started visiting trajectory "<< current_visiting_trajectory<<std::endl;
+        //std::cout<<"Last trajectory "<< last_trajectory_to_be_visited<<std::endl;
         auto next_row = start_vertex->row_index;
         while (true) {
-            std::cout<<"Stuck here." <<std::endl;
+            //std::cout<<"Stuck here." <<std::endl;
             
             bool success = find_match_with_pathlet_from_start_vertex(sample, start_vertex,current_visiting_trajectory);
-            std::cout << "Out of the matching function=> my segmentation fault is not there"<< std::endl;
+            //std::cout << "Out of the matching function=> my segmentation fault is not there"<< std::endl;
             if(success){
-                std::cout<< "Success"<<std::endl;
-                std::cout<< "found match for the pathlet" << pathlet.first<< " "<< pathlet.second <<"at trajectory "<< current_visiting_trajectory << std::endl;
+                //std::cout<< "Success"<<std::endl;
+                //std::cout<< "found match for the pathlet" << pathlet.first<< " "<< pathlet.second <<"at trajectory "<< current_visiting_trajectory << std::endl;
                 counter++;
 
                 if(current_visiting_trajectory == last_trajectory_to_be_visited ){
@@ -221,7 +227,7 @@ public:
                     break;
                 }
                 current_visiting_trajectory =  sample.get_id_at(start_vertex->row_index);
-                std::cout << "after success i am moving ato traj "<< current_visiting_trajectory<< std::endl;
+                //std::cout << "after success i am moving ato traj "<< current_visiting_trajectory<< std::endl;
             }
             else{
 
@@ -418,7 +424,7 @@ private:
 
                 }
                 else{
-                    std::cout <<"The problem is here."<< std::endl;
+                    //std::cout <<"The problem is here."<< std::endl;
                     
                     if(start_vertex->below_left != nullptr && next_column.back()->below_left!= nullptr && start_vertex->below_left->row_index >= next_column.back()->below_left->row_index){continue;}
                     //assert(start_vertex->below_left != nullptr);

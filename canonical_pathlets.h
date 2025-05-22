@@ -51,7 +51,7 @@ class BinaryPathletTree{
             this-> l = min_length;
             this-> d = max_depth;
             this->trajectory_id = traj_id;
-            assert(min_length <= n);
+            //assert(min_length <= n);
 
             assert(this->pathlet_collection.empty()); //assert flat_tree is empty
 
@@ -175,7 +175,7 @@ class BinaryPathletTree{
 
                     int position = level_beginning + k;
                     PathletNode parent  = this->pathlet_collection.at(get_father(position));
-                    std::cout << "Level "<< level<< "pos "<< position<< " father length "<<  pathlet_collection.at(get_father(position)).getPathlet().second- pathlet_collection.at(get_father(position)).getPathlet().first +1<< std::endl;
+                    //std::cout << "Level "<< level<< "pos "<< position<< " father length "<<  pathlet_collection.at(get_father(position)).getPathlet().second- pathlet_collection.at(get_father(position)).getPathlet().first +1<< std::endl;
                     if( parent.isNULL || parent.getLength() <= this-> l){
                         
                         PathletNode nullKid(-1,-1);
@@ -208,8 +208,8 @@ class BinaryPathletTree{
             }
 
             //ASSERTIONS FOR TOY DS
-            assert(pathlet_collection.at(1).getPathlet().first == 0);
-            std::cout << "This is the second extreme of the 1st node of the second levedl (idx = 1)"<< pathlet_collection.at(1).getPathlet().second<< std::endl;
+            //assert(pathlet_collection.at(1).getPathlet().first == 0);
+            //std::cout << "This is the second extreme of the 1st node of the second levedl (idx = 1)"<< pathlet_collection.at(1).getPathlet().second<< std::endl;
         }
 
         

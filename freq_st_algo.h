@@ -47,13 +47,17 @@ class freq_subtrajectory_sampler{
         freq_subtrajectory_sampler(const trajectory_t& trajectory,
             float eps, 
             float del, 
-            distance_t radius, int minimum_length) : the_trajectory(trajectory), epsilon(eps), delta(del), distance_threshold(radius), min_length(minimum_length){}
+            distance_t radius, int minimum_length, int random_seed) : the_trajectory(trajectory), epsilon(eps), delta(del), distance_threshold(radius), min_length(minimum_length), seed(random_seed){
+
+                std::mt19937 seeded_generator(seed);
+                this->mt = seeded_generator;
+            }
 
         void generate_chernoff_sample(){
 
             //Step 1: compute sample size according to Chernoff rule. 
 
-            int sample_size = (int) (3 / (epsilon * epsilon)) * log(2 * 2 * this->total_pathlet_number_respecting_ids() / delta);
+            int sample_size = (int) (3 / (epsilon * epsilon)) * log(2 * this->total_pathlet_number_respecting_ids() / delta);
 
             //Step 2: assert sampling is worthwhile
             if(sample_size > the_trajectory.num_trajectories()){
@@ -155,7 +159,7 @@ class freq_subtrajectory_sampler{
     float delta;
     int min_length;
     bool performed_sampling;
-
+    int seed;
     
 };
 
@@ -275,7 +279,7 @@ class frequent_subtrajectory_algo{
         void collect_maximal_frequent_pathlets(free_space_graph_t& fsg, binary_pathlet_tree_t& pathlet_tree){
 
             int d = pathlet_tree.getDepth(); //Last filled level
-            std::cout<< "tree has depth "<< d <<std::endl; // assertion for my toy dataset
+            //std::cout<< "tree has depth "<< d <<std::endl; // assertion for my toy dataset
             int num_sampled_trajs = this->sample.num_trajectories();
             for (int level = d; d>=0; d--){
 
@@ -286,10 +290,10 @@ class frequent_subtrajectory_algo{
 
                     int position = level_beginning + offset;
                     PathletNode pn = pathlet_tree.getNodeAt(position);
-                    std::cout << "I am visitingq querying pathlet "<< pn.getPathlet().first <<" "<< pn.getPathlet().second<< std::endl;
+                    //std::cout << "I am visitingq querying pathlet "<< pn.getPathlet().first <<" "<< pn.getPathlet().second<< std::endl;
                     if(pn.isNULL ||!(pn.isFrequent())){
                         if (!pn.isFrequent()){
-                        std::cout<< "SEARCH PRUNING"<<std::endl;
+                        //std::cout<< "SEARCH PRUNING"<<std::endl;
                         }
                         continue;
 
@@ -340,7 +344,7 @@ class frequent_subtrajectory_algo{
         void collect_all_frequent_pathlets(free_space_graph_t& fsg, binary_pathlet_tree_t& pathlet_tree){
 
             int d = pathlet_tree.getDepth(); //Last filled level
-            std::cout<< "tree has depth "<< d <<std::endl; // assertion for my toy dataset
+            //std::cout<< "tree has depth "<< d <<std::endl; // assertion for my toy dataset
             int num_sampled_trajs = this->sample.num_trajectories();
             for (int level = d; d>=0; d--){
 
@@ -351,7 +355,7 @@ class frequent_subtrajectory_algo{
 
                     int position = level_beginning + offset;
                     PathletNode pn = pathlet_tree.getNodeAt(position);
-                    std::cout << "I am visitingq querying pathlet "<< pn.getPathlet().first <<" "<< pn.getPathlet().second<< std::endl;
+                    //std::cout << "I am visitingq querying pathlet "<< pn.getPathlet().first <<" "<< pn.getPathlet().second<< std::endl;
                     if(pn.isNULL ||!(pn.isFrequent())){
                         if (!pn.isFrequent()){
                         //std::cout<< "SEARCH PRUNING"<<std::endl;
@@ -374,7 +378,7 @@ class frequent_subtrajectory_algo{
                         just_found.extremes = pn.getPathlet();
                         just_found.pathlet_mother = (pathlet_tree.getTrajectoryId());
                         just_found.frequency = ((float) count / num_sampled_trajs);
-                        std::cout<<"FREQUENCY: "<<pathlet_tree.getNodeAt(position).frequency<< std::endl;
+                        //std::cout<<"FREQUENCY: "<<pathlet_tree.getNodeAt(position).frequency<< std::endl;
                         freq_pathlets.push_back(just_found);
                     }
 
@@ -429,16 +433,21 @@ class frequent_subtrajectory_algo{
 
 
         trajectory_t read_next_transaction_from_file(std::ifstream& file){
-            
-            trajectory_t pathlet_mother;
-            this-> last_parsed_trajectory++;
+
             double x,y;
             id_t id;
+            trajectory_t pathlet_mother;
+
+            file >> x >> y >> id;
+
+            pathlet_mother.push_back({x,y}, id);
+            this-> last_parsed_trajectory = id;
+            
             std::streampos sp = file.tellg();
             while(file >> x>> y >> id){
 
                 if(id != last_parsed_trajectory){
-                    //std::cout<< "i have just found the beginning of trajectory "<< last_parsed_trajectory<< std::endl;
+                    std::cout<< "i have just found the beginning of trajectory "<< last_parsed_trajectory<< std::endl;
                     //ripristina pointer alla riga precedente
                     file.seekg(sp);
                     break;
@@ -448,11 +457,11 @@ class frequent_subtrajectory_algo{
                 //update pointer
                 sp = file.tellg();
             }
-            /*
+            
             std::cout << "trajectory at the end is "<< pathlet_mother.get_id_at(1)<< std::endl;
             std::cout << "actual size "<< pathlet_mother.get_actual_size()<<std::endl;
             std::cout << "num trajectories "<< pathlet_mother.num_trajectories()<< std::endl;
-            */
+            
             return pathlet_mother;
 
         }
