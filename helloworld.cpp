@@ -4,7 +4,7 @@
 #include <omp.h>
 #include <filesystem>
 #include "CLI11.hpp"
-
+#include <chrono>
 #include "free_space_graph.h"
 #include "io.h"
 #include "canonical_pathlets.h"
@@ -17,6 +17,7 @@
 
 using namespace frechet;
 namespace fs = std::filesystem;
+namespace chrono = std::chrono;
 using space = CGAL_metric_space<CGAL::Simple_cartesian<double>, CGAL::Dimension_tag<2>>;
 
 using bbgll_algo = subtrajectory_clustering_bbgll<space>;
@@ -73,14 +74,17 @@ int main(int argc, char** argv){
     
     trajectory_t dataset = read_trajectory_from_file<space>(infilename);
     std::cout << "NUm trajectories in the sample is "<< dataset.num_trajectories()<<std::endl;
-    //freq_subtrajectory_sampler sampler(dataset, epsilon, delta, radius, minimum_length );
-    //sampler.generate_chernoff_sample();
-    //sampler.dump_sample_to_file("./prova.txt"); 
+    
     
     frequent_subtrajectory_algo_t algo(dataset, pathlet_file_name, frequency_threshold, radius); 
-    //algo.populate_range_search_tree_with_sample_points();
+    
+    auto start = chrono::high_resolution_clock::now();
+    algo.compute_all_frequent_pathlets();
+    auto stop =  chrono::high_resolution_clock::now();
 
-    algo.compute_all_frequent_pathlets(); 
+    auto duration = duration_cast<chrono::seconds>(stop - start);
+
+    std::cout << "TIME : "<< duration.count()<< std::endl;
     algo.dump_collected_pathlets_to_file(outfilename);
     return 0;
 }

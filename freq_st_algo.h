@@ -214,7 +214,7 @@ class frequent_subtrajectory_algo{
                 trajectory_t pathlet_mother = this->read_next_transaction_from_file(input_stream);
                 std::cout <<"Parsed a transaction."<<std::endl;
                 std::cout<<" The transaction has ID "<<pathlet_mother.get_id_at(pathlet_mother.get_actual_size()-1)<<std::endl;
-                std::cout <<" I have this many points : "<< pathlet_mother.get_actual_size()<<std::endl;
+                //std::cout <<" I have this many points : "<< pathlet_mother.get_actual_size()<<std::endl;
                 BinaryPathletTree pathlet_tree(pathlet_mother, pathlet_mother.get_id_at(0),floor(log2(pathlet_mother.total_size())) + 1,1);
                 
                 free_space_graph_t fsg(0);
@@ -240,8 +240,8 @@ class frequent_subtrajectory_algo{
             while(!input_stream.eof()){
 
                 trajectory_t pathlet_mother = this->read_next_transaction_from_file(input_stream);
-                std::cout <<"Parsed a transaction."<<std::endl;
-                std::cout<<" The transaction has ID "<<pathlet_mother.get_id_at(pathlet_mother.get_actual_size()-1)<<std::endl;
+                //std::cout <<"Parsed a transaction."<<std::endl;
+                //std::cout<<" The transaction has ID "<<pathlet_mother.get_id_at(pathlet_mother.get_actual_size()-1)<<std::endl;
                 std::cout <<" I have this many points : "<< pathlet_mother.get_actual_size()<<std::endl;
                 BinaryPathletTree pathlet_tree(pathlet_mother, pathlet_mother.get_id_at(0),floor(log2(pathlet_mother.total_size())) + 1,1);
                 
@@ -447,7 +447,7 @@ class frequent_subtrajectory_algo{
             while(file >> x>> y >> id){
 
                 if(id != last_parsed_trajectory){
-                    std::cout<< "i have just found the beginning of trajectory "<< last_parsed_trajectory<< std::endl;
+                    //std::cout<< "i have just found the beginning of trajectory "<< last_parsed_trajectory<< std::endl;
                     //ripristina pointer alla riga precedente
                     file.seekg(sp);
                     break;
@@ -458,9 +458,9 @@ class frequent_subtrajectory_algo{
                 sp = file.tellg();
             }
             
-            std::cout << "trajectory at the end is "<< pathlet_mother.get_id_at(1)<< std::endl;
-            std::cout << "actual size "<< pathlet_mother.get_actual_size()<<std::endl;
-            std::cout << "num trajectories "<< pathlet_mother.num_trajectories()<< std::endl;
+            //std::cout << "trajectory at the end is "<< pathlet_mother.get_id_at(1)<< std::endl;
+            //std::cout << "actual size "<< pathlet_mother.get_actual_size()<<std::endl;
+            //std::cout << "num trajectories "<< pathlet_mother.num_trajectories()<< std::endl;
             
             return pathlet_mother;
 

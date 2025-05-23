@@ -30,6 +30,11 @@ public:
 
     void push_back(const point_t &p, id_t id, [[maybe_unused]] bool allow_deleted = false) {
         assert(allow_deleted || (id != deleted_id));
+        if(trajectory_id.empty() || trajectory_id.back() != id){
+
+            this->num_trajs++;
+
+        }
         vertices.push_back(p);
         trajectory_id.push_back(id);
         original_trajectory_id.push_back(id);
@@ -87,7 +92,8 @@ public:
     }
 
     std::size_t num_trajectories() const {
-        return trajectory_size.size();
+        return num_trajs;
+        //return trajectory_size.size();
     }
 
     bool is_sorted_by_trajectory_id() const {
@@ -166,7 +172,7 @@ private:
     std::vector<point_t> vertices;
     std::vector<id_t> trajectory_id;
     std::vector<id_t> original_trajectory_id;
-
+    int num_trajs = 0;
     std::vector<size_t> trajectory_size;
     std::vector<size_t> num_deleted_vertices_per_trajectory;
 
