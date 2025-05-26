@@ -139,7 +139,7 @@ class freq_subtrajectory_sampler{
             if (sampled_trajs_ids.at(j) == last_read_trajectory){
 
                 repetitions++;
-                sampled_trajs_ids.at(j) += (id_t) (2 * n);
+                sampled_trajs_ids.at(j) += (id_t) (repetitions * n);
 
             }
             else{
