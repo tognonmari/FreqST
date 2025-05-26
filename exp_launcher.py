@@ -41,7 +41,7 @@ def main():
             # Generate one sample for now (seed 0)
                 try:
                     str_exec = f"{SAMPLER_EXECUTABLE} -e {epsilon} -d {delta} {data_folder}/merged.txt {data_folder}/{SAMPLE_FOLDER_NAME}"
-                    child_process = subprocess.run(str_exec, capture_output = True, text = True)
+                    child_process = subprocess.run(str_exec, capture_output = True, text = True, shell = True)
 
                 except subprocess.CalledProcessError as e:
                     logger.error(f"Error executing {str_exec} : {e}")
@@ -81,7 +81,7 @@ def main():
                             handler.close()
 
                         str_exec = f"{PM_EXECUTABLE} -r {rad} -f {freq} {p}/{sample} {dataset}/merged.txt {dataset}/{RESULT_FOLDER_NAME}/{res_file_name} > {dataset}/{OUTPUT_REDIRECT_FOLDER}/{res_file_name}"
-                        child_process = subprocess.run(str_exec, capture_output=True, text=True)
+                        child_process = subprocess.run(str_exec, capture_output=True, text=True, shell=True)
                             
 
                     except subprocess.CalledProcessError as e:
