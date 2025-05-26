@@ -32,7 +32,7 @@ class freq_subtrajectory_sampler{
     using point_t = space::point_t;
     using distance_function_t = space::distance_function_t;
     using distance_t = distance_function_t::distance_t;
-
+    
     using trajectory_t = trajectory_collection<space>;
     using index_t = trajectory_t::index_t;
     using subtrajectory_t = trajectory_t::subtrajectory_t;
@@ -56,9 +56,9 @@ class freq_subtrajectory_sampler{
         void generate_chernoff_sample(){
 
             //Step 1: compute sample size according to Chernoff rule. 
-
+            (this->sampled_trajs_ids).clear();
             int sample_size = (int) (3 / (epsilon * epsilon)) * log(2 * this->total_pathlet_number_respecting_ids() / delta);
-
+            std::cout << "sample_size is "<< sample_size <<std::endl;
             //Step 2: assert sampling is worthwhile
             if(sample_size > the_trajectory.num_trajectories()){
 
@@ -71,6 +71,25 @@ class freq_subtrajectory_sampler{
             //Step 3: Sample indexes with replacement
             
             this->sample_trajectories(sample_size); //FILLS IN CLASS VARIABLE SAMPLE
+
+        }
+
+        void generate_vc_sample(){
+
+            //Step 1: compute sample size according to Chernoff rule. 
+            (this->sampled_trajs_ids).clear();
+            int sample_size = (int) (0.5 / (epsilon * epsilon)) * (this->vc_dim() + log(1 / delta));
+            std::cout << "sample_size is "<< sample_size <<std::endl;
+            //Step 2: assert sampling is worthwhile
+            if(sample_size > the_trajectory.num_trajectories()){
+
+                std::cerr << "Chernoff Bound was too loose for your dataset."<< std::endl;
+
+                std::exit(1);
+
+            }
+            //Step 3: Sample indexes with replacement
+            this->sample_trajectories(sample_size);
 
         }
 
@@ -89,6 +108,61 @@ class freq_subtrajectory_sampler{
 
 
     private:
+
+    int vc_dim(){
+
+        //Compute VC Dimension 
+        range_search_t search{the_trajectory};
+        std::vector<int> c;
+        index_t last_seen_trajectory = the_trajectory.get_id_at(0);
+        std::set<index_t> traj_set;
+        
+        for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
+
+            if(the_trajectory.get_id_at(i) == last_seen_trajectory){
+
+                for (const auto idx: search.search(i, this->distance_threshold)) {
+
+                    traj_set.insert(idx);
+
+                }
+            }
+            else{
+
+                // Append the result up to now to c
+                c.push_back(floor(log2(traj_set.size()) + 1));
+                //initialize the set again 
+                traj_set.clear();
+                last_seen_trajectory = the_trajectory.get_id_at(i);
+                //add info for the current point
+                for (const auto idx: search.search(i, this->distance_threshold)) {
+
+                    traj_set.insert(idx);
+
+                }
+
+
+            }
+
+        }
+
+        std::sort(c.begin(),c.end(), std::greater<>());
+        
+        int vc_dim = 0;
+        
+        for(int i = 0 ; i < c.size(); i++){
+
+            if(vc_dim < c.at(i)){
+
+                vc_dim++;
+
+            }
+
+        }
+
+        return vc_dim;
+    }
+
     void print_subtrajectory_to_file(std::ofstream& fout, id_t& id){
 
         size_t n = the_trajectory.num_trajectories();
@@ -308,12 +382,8 @@ class frequent_subtrajectory_algo{
                     }
                     else{
 
-                        pathlet_tree.setEstimatedFrequency(position, (float)(count / num_sampled_trajs));
-                        frequent_pathlet just_found;
-                        just_found.extremes = pn.getPathlet();
-                        just_found.pathlet_mother = (pathlet_tree.getTrajectoryId());
-                        just_found.frequency = pn.getFrequency();
-                        freq_pathlets.push_back(just_found);
+                        pathlet_tree.setEstimatedFrequency(position, ((float) count / num_sampled_trajs));
+
                     }
 
                 }
@@ -328,15 +398,60 @@ class frequent_subtrajectory_algo{
                 just_found.extremes = pn.getPathlet();
                 just_found.pathlet_mother = (pathlet_tree.getTrajectoryId());
                 just_found.frequency = pn.frequency;
-                std::cout<<"FREQUENCY: "<<pathlet_tree.getNodeAt(0).frequency<< std::endl;
+                
                 freq_pathlets.push_back(just_found);
                 return;
             }
-            for(int level = 1 ; level>=d; level++){
+            //TODO: clean up beacuse this is horrible
+            std::queue<int> nodes_to_visit;
+            PathletNode pn =pathlet_tree.getNodeAt(binary_pathlet_tree_t::left_child_idx(0));
+            if(!pn.isNULL && pn.getLength() > 1){
+                nodes_to_visit.push(binary_pathlet_tree_t::left_child_idx(0));
+            }
 
-                
+            PathletNode pn1=pathlet_tree.getNodeAt(binary_pathlet_tree_t::right_child_idx(0));
+
+            if(!pn1.isNULL && pn1.getLength() > 1){
+
+                nodes_to_visit.push(binary_pathlet_tree_t::right_child_idx(0));
 
             }
+
+
+            while(!nodes_to_visit.empty()){
+
+                int pathlet_idx = nodes_to_visit.front();
+                nodes_to_visit.pop();
+
+                if(pathlet_tree.getNodeAt(pathlet_idx).isFrequent()){
+
+                    PathletNode pn = pathlet_tree.getNodeAt(pathlet_idx);
+                    frequent_pathlet just_found;
+                    just_found.extremes = pn.getPathlet();
+                    just_found.pathlet_mother = (pathlet_tree.getTrajectoryId());
+                    just_found.frequency = pn.frequency;
+                    freq_pathlets.push_back(just_found);                    
+
+                }
+                else{
+
+                    PathletNode pn =pathlet_tree.getNodeAt(binary_pathlet_tree_t::left_child_idx(pathlet_idx));
+                    if(!pn.isNULL && pn.getLength() > 1){
+                        nodes_to_visit.push(binary_pathlet_tree_t::left_child_idx(pathlet_idx));
+                    }
+
+                    PathletNode pn1 =pathlet_tree.getNodeAt(binary_pathlet_tree_t::right_child_idx(pathlet_idx));
+
+                    if(!pn1.isNULL && pn1.getLength() > 1){
+
+                        nodes_to_visit.push(binary_pathlet_tree_t::right_child_idx(pathlet_idx));
+
+                    }
+
+                }
+
+            }
+
 
         }
         
@@ -374,6 +489,7 @@ class frequent_subtrajectory_algo{
                     else{
                         //TODO: CLEANUP
                         pathlet_tree.setEstimatedFrequency(position, ((float)count / num_sampled_trajs));
+                        assert(pathlet_tree.getNodeAt(position).frequency - ((float)count / num_sampled_trajs) < 0.0001 );
                         frequent_pathlet just_found;
                         just_found.extremes = pn.getPathlet();
                         just_found.pathlet_mother = (pathlet_tree.getTrajectoryId());

@@ -79,7 +79,7 @@ int main(int argc, char** argv){
     frequent_subtrajectory_algo_t algo(dataset, pathlet_file_name, frequency_threshold, radius); 
     
     auto start = chrono::high_resolution_clock::now();
-    algo.compute_all_frequent_pathlets();
+    algo.compute_maximal_frequent_pathlets();
     auto stop =  chrono::high_resolution_clock::now();
 
     auto duration = duration_cast<chrono::seconds>(stop - start);

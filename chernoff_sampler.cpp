@@ -73,10 +73,10 @@ int main(int argc, char** argv){
     
     
     trajectory_t dataset = read_trajectory_from_file<space>(infilename);
-    freq_subtrajectory_sampler<space> sampler(dataset, epsilon, delta, 1, minimum_length, seed );
+    freq_subtrajectory_sampler<space> sampler(dataset, epsilon, delta, 150, minimum_length, seed );
     sampler.generate_chernoff_sample();
     sampler.dump_sample_to_file(std::format("{}/chernoff_{}_{}_{}.txt", outfiledir, epsilon, delta, seed)); 
-    
+    sampler.generate_vc_sample();
     //frequent_subtrajectory_algo_t algo(dataset, infilename, 0.4, 50); 
     //algo.populate_range_search_tree_with_sample_points();
 
