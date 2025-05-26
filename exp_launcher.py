@@ -36,7 +36,7 @@ def main():
         for delta in DELTA_LIST:
             for data_folder in DATASET_FOLDERS:
 
-                if not os.path(f"{data_folder}/{SAMPLE_FOLDER_NAME}").is_dir():
+                if not Path(f"{data_folder}/{SAMPLE_FOLDER_NAME}").exists():
                     os.makedirs(f"{data_folder}/{SAMPLE_FOLDER_NAME}")
             # Generate one sample for now (seed 0)
                 try:
@@ -75,7 +75,7 @@ def main():
 
                         res_file_name = f"{sample.replace(".txt", "")}_{rad}_{freq}.txt"
                         outfilepath = Path(f"{dataset}/{OUTPUT_REDIRECT_FOLDER}/{res_file_name}")
-                        
+
                         if not outfilepath.exists():
                             handler = open(outfilepath, 'w')
                             handler.close()
