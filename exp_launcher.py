@@ -31,6 +31,7 @@ def main():
 
     logger = logging.getLogger('ALGO ST EXPERIMENTS')
     logger.setLevel(logging.INFO)
+    logging.basicConfig(filename=LOG_FILE, level=logging.INFO)
     #Generate the necessary samples
     for epsilon in EPSILON_LIST:
         for delta in DELTA_LIST:
@@ -73,16 +74,21 @@ def main():
                         #ensure out dir and file exist
                         
 
-                        res_file_name = f"{sample.replace(".txt", "")}_{rad}_{freq}.txt"
+                        res_file_name = f"{sample.name.replace(".txt", "")}_{rad}_{freq}.txt"
                         outfilepath = Path(f"{dataset}/{OUTPUT_REDIRECT_FOLDER}/{res_file_name}")
 
+                        if not Path(f"{dataset}/{OUTPUT_REDIRECT_FOLDER}").exists:
+                            os.makedirs(f"{dataset}/{OUTPUT_REDIRECT_FOLDER}")
+
                         if not outfilepath.exists():
+
                             handler = open(outfilepath, 'w')
                             handler.close()
 
-                        str_exec = f"{PM_EXECUTABLE} -r {rad} -f {freq} {p}/{sample} {dataset}/merged.txt {dataset}/{RESULT_FOLDER_NAME}/{res_file_name} > {dataset}/{OUTPUT_REDIRECT_FOLDER}/{res_file_name}"
+                        str_exec = f"{PM_EXECUTABLE} -r {rad} -f {freq} {sample} {dataset}/merged.txt {dataset}/{RESULT_FOLDER_NAME}/{res_file_name} > {dataset}/{OUTPUT_REDIRECT_FOLDER}/{res_file_name}"
+                        
                         child_process = subprocess.run(str_exec, capture_output=True, text=True, shell=True)
-                            
+                        
 
                     except subprocess.CalledProcessError as e:
                         logger.error(f"Error executing {str_exec} : {e}")
