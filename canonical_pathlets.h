@@ -129,17 +129,6 @@ class BinaryPathletTree{
 
         }
 
-
-
-        private: //class variables + tree access methods
-
-        std::vector<PathletNode> pathlet_collection; 
-        int n;
-        int d;
-        int l;
-        trajectory_t support;
-        id_t trajectory_id;
-
         static inline int left_child_idx(int node_idx){
 
             return 2 * node_idx + 1;
@@ -151,6 +140,17 @@ class BinaryPathletTree{
             return 2* node_idx + 2;
 
         }
+
+        private: //class variables + tree access methods
+
+        std::vector<PathletNode> pathlet_collection; 
+        int n;
+        int d;
+        int l;
+        trajectory_t support;
+        id_t trajectory_id;
+
+        
 
         static inline int get_father(int node_idx){
 
