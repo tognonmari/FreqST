@@ -1,6 +1,6 @@
 #include <CGAL/Dimension.h>
 #include <CGAL/Simple_cartesian.h>
-
+#include <iostream>
 #include <omp.h>
 #include <filesystem>
 #include "CLI11.hpp"
@@ -79,12 +79,13 @@ int main(int argc, char** argv){
     frequent_subtrajectory_algo_t algo(dataset, pathlet_file_name, frequency_threshold, radius); 
     
     auto start = chrono::high_resolution_clock::now();
-    algo.compute_maximal_frequent_pathlets();
+    algo.compute_all_frequent_pathlets();
     auto stop =  chrono::high_resolution_clock::now();
-
+    
     auto duration = duration_cast<chrono::seconds>(stop - start);
-
-    std::cout << "TIME : "<< duration.count()<< std::endl;
+    std::cout<< "TIME : "<< duration.count()<< std::endl;
+    
     algo.dump_collected_pathlets_to_file(outfilename);
+
     return 0;
 }
