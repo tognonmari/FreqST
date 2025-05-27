@@ -9,13 +9,13 @@ SAMPLER_EXECUTABLE = "./chernoff_sampler"
 
 PM_EXECUTABLE = "./helloworld"
 
-EPSILON_LIST = [0.05, 0.1, 0.15, 0.2]
+EPSILON_LIST = [0.05, 0.1, 0.15, 0.2, 0.25]
 
 DELTA_LIST = [0.025, 0.05, 0.1]
 
-DATASET_FOLDERS = ["./athens_small", "./chicago", "./berlin"]
+DATASET_FOLDERS = ["./berlin"]
 
-RADIUS_LIST = [50, 100, 200]
+RADIUS_LIST = [50, 100, 150, 200, 1500]
 
 FREQUENCY_LIST = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
 
@@ -30,25 +30,27 @@ RESULT_FOLDER_NAME = "results"
 def main():
 
     logger = logging.getLogger('ALGO ST EXPERIMENTS')
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.ERROR)
     logging.basicConfig(filename=LOG_FILE, level=logging.INFO)
     #Generate the necessary samples
+    '''
     for epsilon in EPSILON_LIST:
         for delta in DELTA_LIST:
-            for data_folder in DATASET_FOLDERS:
+            for rad in RADIUS_LIST:
+                for data_folder in DATASET_FOLDERS:
 
-                if not Path(f"{data_folder}/{SAMPLE_FOLDER_NAME}").exists():
-                    os.makedirs(f"{data_folder}/{SAMPLE_FOLDER_NAME}")
-            # Generate one sample for now (seed 0)
-                try:
-                    str_exec = f"{SAMPLER_EXECUTABLE} -e {epsilon} -d {delta} {data_folder}/merged.txt {data_folder}/{SAMPLE_FOLDER_NAME}"
-                    child_process = subprocess.run(str_exec, capture_output = True, text = True, shell = True)
+                    if not Path(f"{data_folder}/{SAMPLE_FOLDER_NAME}").exists():
+                        os.makedirs(f"{data_folder}/{SAMPLE_FOLDER_NAME}")
+                # Generate one sample for now (seed 0)
+                    try:
+                        str_exec = f"{SAMPLER_EXECUTABLE} -e {epsilon} -d {delta} -r {rad} {data_folder}/merged.txt {data_folder}/{SAMPLE_FOLDER_NAME}"
+                        child_process = subprocess.run(str_exec, capture_output = True, text = True, shell = True)
+                        print(child_process.stdout)
+                    except subprocess.CalledProcessError as e:
+                        logger.error(f"Error executing {str_exec} : {e}")
 
-                except subprocess.CalledProcessError as e:
-                    logger.error(f"Error executing {str_exec} : {e}")
-
-                    continue
-    
+                        continue
+    '''
     # Not all the samples guarantee to be created, because chernoff smaple is loose
 
     # check utility dirs exist
@@ -93,7 +95,6 @@ def main():
                     except subprocess.CalledProcessError as e:
                         logger.error(f"Error executing {str_exec} : {e}")
                         logger.error(child_process.stderr)
-
 
 
 if __name__ == "__main__":

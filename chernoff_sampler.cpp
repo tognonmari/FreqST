@@ -41,6 +41,7 @@ int main(int argc, char** argv){
     float frequency_threshold, epsilon, delta;
     int minimum_length = 1;
     int seed = 0;
+    distance_t radius;
     std::string infilename, outfiledir;
     sampling_mode mode;
 
@@ -54,6 +55,10 @@ int main(int argc, char** argv){
     app.add_option("-d,--delta",
                    delta,
                    "Confidence parameter.")
+        ->required();
+    app.add_option("-r,--radius",
+                    radius,
+                    "The radius for the vc dimension.")
         ->required();
     app.add_option("input",
                    infilename,
@@ -73,10 +78,11 @@ int main(int argc, char** argv){
     
     
     trajectory_t dataset = read_trajectory_from_file<space>(infilename);
-    freq_subtrajectory_sampler<space> sampler(dataset, epsilon, delta, 150, minimum_length, seed );
+    freq_subtrajectory_sampler<space> sampler(dataset, epsilon, delta, radius, minimum_length, seed );
     sampler.generate_chernoff_sample();
     sampler.dump_sample_to_file(std::format("{}/chernoff_{}_{}_{}.txt", outfiledir, epsilon, delta, seed)); 
     sampler.generate_vc_sample();
+    sampler.dump_sample_to_file(std::format("{}/vc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
     //frequent_subtrajectory_algo_t algo(dataset, infilename, 0.4, 50); 
     //algo.populate_range_search_tree_with_sample_points();
 

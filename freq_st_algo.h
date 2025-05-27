@@ -58,7 +58,7 @@ class freq_subtrajectory_sampler{
             //Step 1: compute sample size according to Chernoff rule. 
             (this->sampled_trajs_ids).clear();
             int sample_size = (int) (3 / (epsilon * epsilon)) * log(2 * this->total_pathlet_number_respecting_ids() / delta);
-            std::cout << "sample_size is "<< sample_size <<std::endl;
+            std::cout << "Chernoff sample size with espilon "<<epsilon << ",delta "<< delta <<" is: "<< sample_size <<std::endl;
             //Step 2: assert sampling is worthwhile
             if(sample_size > the_trajectory.num_trajectories()){
 
@@ -78,12 +78,12 @@ class freq_subtrajectory_sampler{
 
             //Step 1: compute sample size according to Chernoff rule. 
             (this->sampled_trajs_ids).clear();
-            int sample_size = (int) (0.5 / (epsilon * epsilon)) * (this->vc_dim() + log(1 / delta));
-            std::cout << "sample_size is "<< sample_size <<std::endl;
+            int sample_size = (int) (2 / (epsilon * epsilon)) * (this->vc_dim() + log(1 / delta));
+            std::cout << "VCdim sample size with espilon "<<epsilon << ",  delta "<< delta <<", radius "<< distance_threshold<< " is: "<< sample_size <<std::endl;
             //Step 2: assert sampling is worthwhile
             if(sample_size > the_trajectory.num_trajectories()){
 
-                std::cerr << "Chernoff Bound was too loose for your dataset."<< std::endl;
+                std::cerr << "VC Bound was too loose for your dataset."<< std::endl;
 
                 std::exit(1);
 
@@ -93,7 +93,7 @@ class freq_subtrajectory_sampler{
 
         }
 
-        void dump_sample_to_file(std::string filename){//TODO: RIFARE!!!!!!!!
+        void dump_sample_to_file(std::string filename){
 
             assert(!sampled_trajs_ids.empty());
             std::ofstream fout(filename);
