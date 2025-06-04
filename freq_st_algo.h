@@ -93,12 +93,31 @@ class freq_subtrajectory_sampler{
 
         }
 
-        void dump_sample_to_file(std::string filename){
+        void generate_rough_vc_sample(){
 
+            //Step 1: compute sample size according to Chernoff rule. 
+            (this->sampled_trajs_ids).clear();
+            int sample_size = (int) (2 / (epsilon * epsilon)) * (this->rough_vc_dim() + log(1 / delta));
+            std::cout << " Rough VCdim sample size with espilon "<<epsilon << ",  delta "<< delta <<", radius "<< distance_threshold<< " is: "<< sample_size <<std::endl;
+            //Step 2: assert sampling is worthwhile
+            if(sample_size > the_trajectory.num_trajectories()){
+
+                std::cerr << "VC Bound was too loose for your dataset."<< std::endl;
+
+                std::exit(1);
+
+            }
+            //Step 3: Sample indexes with replacement
+            this->sample_trajectories(sample_size);
+
+        }
+
+        void dump_sample_to_file(std::string filename){
+            std::cout << "Started dumping the sample to a file"<< std::endl;
             assert(!sampled_trajs_ids.empty());
             std::ofstream fout(filename);
             for (int j = 0; j< sampled_trajs_ids.size(); j++){
-
+                std::cout << "I am printing the sample "<< j <<std::endl;
                 this->print_subtrajectory_to_file(fout, sampled_trajs_ids.at(j));
 
             }
@@ -108,7 +127,51 @@ class freq_subtrajectory_sampler{
 
 
     private:
+    int rough_vc_dim(){
+        range_search_t search{the_trajectory};
+        std::vector<int> c;
+        index_t last_seen_trajectory = the_trajectory.get_id_at(0);
+        int counter;
+        
+        for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
+            std::cout<< "Processing trajectory "<< i<< " to find the c bound" << std::endl;
+            if(the_trajectory.get_id_at(i) == last_seen_trajectory){
 
+                counter += search.search(i, this->distance_threshold).size();
+
+            }
+            else{
+
+                // Append the result up to now to c
+                c.push_back(floor(log2(counter) + 1));
+                //initialize the set again 
+                counter = 0;
+                last_seen_trajectory = the_trajectory.get_id_at(i);
+                counter += search.search(i, this->distance_threshold).size();
+                //add info for the current point
+
+
+            }
+
+        }
+        std::cout << "Started sorting "<< std::endl;
+        std::sort(c.begin(),c.end(), std::greater<>());
+        std::cout << "Finished sorting "<< std::endl;
+        int vc_dim = 0;
+        
+        for(int i = 0 ; i < c.size(); i++){
+
+            if(vc_dim < c.at(i)){
+
+                vc_dim++;
+
+            }
+
+        }
+
+        return vc_dim;
+
+    }
     int vc_dim(){
 
         //Compute VC Dimension 
@@ -118,7 +181,7 @@ class freq_subtrajectory_sampler{
         std::set<index_t> traj_set;
         
         for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-
+            std::cout<< "Processing trajectory "<< i<< " to find the c bound" << std::endl;
             if(the_trajectory.get_id_at(i) == last_seen_trajectory){
 
                 for (const auto idx: search.search(i, this->distance_threshold)) {
@@ -145,9 +208,9 @@ class freq_subtrajectory_sampler{
             }
 
         }
-
+        std::cout << "Started sorting "<< std::endl;
         std::sort(c.begin(),c.end(), std::greater<>());
-        
+        std::cout << "Finished sorting "<< std::endl;
         int vc_dim = 0;
         
         for(int i = 0 ; i < c.size(); i++){
@@ -188,7 +251,7 @@ class freq_subtrajectory_sampler{
         return total;
 
     }
-
+    //return type should be void-> TODO:correct this!!!
     std::vector<id_t> sample_trajectories(int sample_size){
 
         if(! sampled_trajs_ids.empty()){
@@ -203,13 +266,14 @@ class freq_subtrajectory_sampler{
             sampled_trajs_ids.push_back((id_t)(mt())% n);
 
         }
-
+        std::cout << "Started sorting "<< std::endl;
         std::sort(sampled_trajs_ids.begin(),sampled_trajs_ids.end());
+        std::cout << "Finished sorting "<< std::endl;
         id_t last_read_trajectory = sampled_trajs_ids.at(0);
         int repetitions = 0;
         //ri scorriamo il vettore. ad ogni ripetizione i dello stesso id assegnamo un nuovo id 
         for( int j = 1; j< sample_size; j++){
-
+            
             if (sampled_trajs_ids.at(j) == last_read_trajectory){
 
                 repetitions++;
@@ -221,7 +285,7 @@ class freq_subtrajectory_sampler{
                 repetitions = 0;
             }
         }
-
+        std::cout<< "I have finished the method to get the ids"<< std::endl;
         return sampled_trajs_ids;
     }
 
@@ -282,12 +346,12 @@ class frequent_subtrajectory_algo{
 
             //open full dataset file 
             std::ifstream input_stream(this->dataset_location);
-            std::cout <<"Starting reading the transactions."<<std::endl;
+            //std::cout <<"Starting reading the transactions."<<std::endl;
             while(!input_stream.eof()){
 
                 trajectory_t pathlet_mother = this->read_next_transaction_from_file(input_stream);
-                std::cout <<"Parsed a transaction."<<std::endl;
-                std::cout<<" The transaction has ID "<<pathlet_mother.get_id_at(pathlet_mother.get_actual_size()-1)<<std::endl;
+                //std::cout <<"Parsed a transaction."<<std::endl;
+                //std::cout<<" The transaction has ID "<<pathlet_mother.get_id_at(pathlet_mother.get_actual_size()-1)<<std::endl;
                 //std::cout <<" I have this many points : "<< pathlet_mother.get_actual_size()<<std::endl;
                 BinaryPathletTree pathlet_tree(pathlet_mother, pathlet_mother.get_id_at(0),floor(log2(pathlet_mother.total_size())) + 1,1);
                 
@@ -295,7 +359,7 @@ class frequent_subtrajectory_algo{
                 
                 //for all the columns of the bst populate the column
                 this->populate_all_columns(fsg, pathlet_mother);
-                std::cout <<"Populated the columns."<<std::endl;
+                //std::cout <<"Populated the columns."<<std::endl;
                 //maybe i need to rewrite the kd tree to access with the coordinates directly
                 this->collect_all_frequent_pathlets(fsg, pathlet_tree);
 
