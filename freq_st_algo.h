@@ -4,22 +4,16 @@
 #include <iostream>
 #include <limits>
 #include <list>
-#include <memory>
-#include <optional>
 #include <vector>
 #include <random>
 
 #include "free_space_graph_free_axis.h"
-#include "frechet_distance.h"
-#include "free_space_graph.h"
 #include "kdtree_range_search.h"
 #include "metric_space.h"
-#include "profiling.h"
 #include "io.h"
-#include "subtrajectory_cluster.h"
-#include "subtrajectory_routine_bbgll.h"
 #include "trajectory.h"
 #include "canonical_pathlets.h"
+
 namespace frechet{
 
 template<metric_space m_space>
@@ -28,18 +22,12 @@ class freq_subtrajectory_sampler{
     public:
     using space = m_space;
     using range_search_t = kd_tree_range_search<space>;
-
     using point_t = space::point_t;
     using distance_function_t = space::distance_function_t;
     using distance_t = distance_function_t::distance_t;
-    
     using trajectory_t = trajectory_collection<space>;
     using index_t = trajectory_t::index_t;
     using subtrajectory_t = trajectory_t::subtrajectory_t;
-
-    using subtrajectory_cluster_t = subtrajectory_cluster<space>;
-
-
     using id_t = trajectory_t::id_t;
     
     
@@ -56,7 +44,9 @@ class freq_subtrajectory_sampler{
         void generate_chernoff_sample(){
 
             //Step 1: compute sample size according to Chernoff rule. 
+
             (this->sampled_trajs_ids).clear();
+
             int sample_size = (int) (3 / (epsilon * epsilon)) * log(2 * this->total_pathlet_number_respecting_ids() / delta);
             std::cout << "Chernoff sample size with espilon "<<epsilon << ",delta "<< delta <<" is: "<< sample_size <<std::endl;
             //Step 2: assert sampling is worthwhile
@@ -70,14 +60,16 @@ class freq_subtrajectory_sampler{
             
             //Step 3: Sample indexes with replacement
             
-            this->sample_trajectories(sample_size); //FILLS IN CLASS VARIABLE SAMPLE
+            this->sample_trajectories(sample_size); 
 
         }
 
         void generate_vc_sample(){
 
             //Step 1: compute sample size according to Chernoff rule. 
+
             (this->sampled_trajs_ids).clear();
+
             int sample_size = (int) (2 / (epsilon * epsilon)) * (this->vc_dim() + log(1 / delta));
             std::cout << "VCdim sample size with espilon "<<epsilon << ",  delta "<< delta <<", radius "<< distance_threshold<< " is: "<< sample_size <<std::endl;
             //Step 2: assert sampling is worthwhile
@@ -97,6 +89,7 @@ class freq_subtrajectory_sampler{
 
             //Step 1: compute sample size according to Chernoff rule. 
             (this->sampled_trajs_ids).clear();
+
             int sample_size = (int) (2 / (epsilon * epsilon)) * (this->rough_vc_dim() + log(1 / delta));
             std::cout << " Rough VCdim sample size with espilon "<<epsilon << ",  delta "<< delta <<", radius "<< distance_threshold<< " is: "<< sample_size <<std::endl;
             //Step 2: assert sampling is worthwhile
@@ -113,18 +106,32 @@ class freq_subtrajectory_sampler{
         }
 
         void dump_sample_to_file(std::string filename){
+
             std::cout << "Started dumping the sample to a file"<< std::endl;
             assert(!sampled_trajs_ids.empty());
             std::ofstream fout(filename);
             for (int j = 0; j< sampled_trajs_ids.size(); j++){
-                std::cout << "I am printing the sample "<< j <<std::endl;
+                //std::cout << "I am printing the sample "<< j <<std::endl;
                 this->print_subtrajectory_to_file(fout, sampled_trajs_ids.at(j));
 
             }
+
             return;
         }
 
+        void generate_fixed_size_sample(int size){
 
+            (this->sampled_trajs_ids).clear();
+
+            if(size > the_trajectory.num_trajectories()){
+
+                std::cerr << "VC Bound was too loose for your dataset."<< std::endl;
+
+                std::exit(1);
+
+            }
+            this->sample_trajectories(size);
+        }
 
     private:
     int rough_vc_dim(){
@@ -134,7 +141,10 @@ class freq_subtrajectory_sampler{
         int counter;
         
         for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-            std::cout<< "Processing trajectory "<< i<< " to find the c bound" << std::endl;
+            std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+
+            
+
             if(the_trajectory.get_id_at(i) == last_seen_trajectory){
 
                 counter += search.search(i, this->distance_threshold).size();
@@ -153,10 +163,9 @@ class freq_subtrajectory_sampler{
 
             }
 
-        }
-        std::cout << "Started sorting "<< std::endl;
+        }  
         std::sort(c.begin(),c.end(), std::greater<>());
-        std::cout << "Finished sorting "<< std::endl;
+
         int vc_dim = 0;
         
         for(int i = 0 ; i < c.size(); i++){
@@ -181,7 +190,7 @@ class freq_subtrajectory_sampler{
         std::set<index_t> traj_set;
         
         for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-            std::cout<< "Processing trajectory "<< i<< " to find the c bound" << std::endl;
+            std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
             if(the_trajectory.get_id_at(i) == last_seen_trajectory){
 
                 for (const auto idx: search.search(i, this->distance_threshold)) {
@@ -208,9 +217,7 @@ class freq_subtrajectory_sampler{
             }
 
         }
-        std::cout << "Started sorting "<< std::endl;
         std::sort(c.begin(),c.end(), std::greater<>());
-        std::cout << "Finished sorting "<< std::endl;
         int vc_dim = 0;
         
         for(int i = 0 ; i < c.size(); i++){
@@ -252,7 +259,7 @@ class freq_subtrajectory_sampler{
 
     }
     //return type should be void-> TODO:correct this!!!
-    std::vector<id_t> sample_trajectories(int sample_size){
+    void sample_trajectories(int sample_size){
 
         if(! sampled_trajs_ids.empty()){
 
@@ -266,12 +273,11 @@ class freq_subtrajectory_sampler{
             sampled_trajs_ids.push_back((id_t)(mt())% n);
 
         }
-        std::cout << "Started sorting "<< std::endl;
+
         std::sort(sampled_trajs_ids.begin(),sampled_trajs_ids.end());
-        std::cout << "Finished sorting "<< std::endl;
+
         id_t last_read_trajectory = sampled_trajs_ids.at(0);
         int repetitions = 0;
-        //ri scorriamo il vettore. ad ogni ripetizione i dello stesso id assegnamo un nuovo id 
         for( int j = 1; j< sample_size; j++){
             
             if (sampled_trajs_ids.at(j) == last_read_trajectory){
@@ -286,7 +292,7 @@ class freq_subtrajectory_sampler{
             }
         }
         std::cout<< "I have finished the method to get the ids"<< std::endl;
-        return sampled_trajs_ids;
+        return;
     }
 
     std::mt19937 mt;
