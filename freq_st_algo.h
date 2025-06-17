@@ -8,7 +8,7 @@
 #include <optional>
 #include <vector>
 #include <random>
-
+#include <chrono>
 #include "free_space_graph_free_axis.h"
 #include "frechet_distance.h"
 #include "free_space_graph.h"
@@ -20,6 +20,7 @@
 #include "subtrajectory_routine_bbgll.h"
 #include "trajectory.h"
 #include "canonical_pathlets.h"
+namespace chrono = std::chrono;
 namespace frechet{
 
 template<metric_space m_space>
@@ -134,7 +135,12 @@ class freq_subtrajectory_sampler{
         int counter;
         
         for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-            std::cout<< "Processing trajectory "<< i<< " to find the c bound" << std::endl;
+            if(i%10000 == 0){
+
+                
+                std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+
+            }
             if(the_trajectory.get_id_at(i) == last_seen_trajectory){
 
                 counter += search.search(i, this->distance_threshold).size();
@@ -181,7 +187,12 @@ class freq_subtrajectory_sampler{
         std::set<index_t> traj_set;
         
         for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-            std::cout<< "Processing trajectory "<< i<< " to find the c bound" << std::endl;
+            if(i%10000 == 0){
+
+                
+                std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+
+            }
             if(the_trajectory.get_id_at(i) == last_seen_trajectory){
 
                 for (const auto idx: search.search(i, this->distance_threshold)) {
@@ -348,11 +359,11 @@ class frequent_subtrajectory_algo{
             std::ifstream input_stream(this->dataset_location);
             //std::cout <<"Starting reading the transactions."<<std::endl;
             while(!input_stream.eof()){
-
+                auto start = chrono::high_resolution_clock::now();
                 trajectory_t pathlet_mother = this->read_next_transaction_from_file(input_stream);
                 //std::cout <<"Parsed a transaction."<<std::endl;
-                //std::cout<<" The transaction has ID "<<pathlet_mother.get_id_at(pathlet_mother.get_actual_size()-1)<<std::endl;
-                //std::cout <<" I have this many points : "<< pathlet_mother.get_actual_size()<<std::endl;
+                std::cout<<" The transaction has ID "<<pathlet_mother.get_id_at(pathlet_mother.get_actual_size()-1)<<std::endl;
+                std::cout <<" I have this many points : "<< pathlet_mother.get_actual_size()<<std::endl;
                 BinaryPathletTree pathlet_tree(pathlet_mother, pathlet_mother.get_id_at(0),floor(log2(pathlet_mother.total_size())) + 1,1);
                 
                 free_space_graph_t fsg(0);
@@ -362,7 +373,9 @@ class frequent_subtrajectory_algo{
                 //std::cout <<"Populated the columns."<<std::endl;
                 //maybe i need to rewrite the kd tree to access with the coordinates directly
                 this->collect_all_frequent_pathlets(fsg, pathlet_tree);
-
+                auto stop = chrono::high_resolution_clock::now();
+                auto duration = duration_cast<chrono::milliseconds>(stop - start);
+                std::cout<< "TIME : "<< duration.count()<< std::endl;
             }
 
 
