@@ -18,7 +18,6 @@
 
 namespace frechet {
 
-// A version of the `sparse_free_space_graph` that has pointeers for both the lowest and highest vertex per column
 template<metric_space m_space>
 class free_space_graph_free_axis{
 
@@ -108,8 +107,8 @@ public:
                                           new_vertex->label_below,
                                           right_column});
     }
-
-    void delete_column() {
+    /**
+     * void delete_column() {
         auto *delete_ptr = lowest_vertex_per_column.front();
         lowest_vertex_per_column.pop_front();
         while (delete_ptr != nullptr) {
@@ -184,18 +183,26 @@ public:
 
         TIME_END(query_cluster);
     }
+     */
+    
 
-//============= Modifica quello che vuoi ========
-// Frechet is already set up as I want it to be, i.e. the square blocks. So I do not need the traj id on the row anymore right?
+    // FOR FREQUENT SUBTRAJECTORIES 
     int query_one_pathlet_over_the_sample(const trajectory_t &sample, const subtrajectory_t &pathlet) {
         //assert(output_trajectories.empty());
-        TIME_BEGIN();
+        
         int counter = 0;
-        vertex* start_vertex = lowest_vertex_per_column.at(pathlet.second);
+        // It starts from the lowest 0 in the rightmost column of the pathlet, columns are indexed just like the points in the pathlet_mother. In the below fsg, if the pathlet is 0-2 it starts from the only zero along the lowest row.
+
+        // 0 0 0 0
+        // 0 1 0 1  
+        // 1 1 0 1
+
+        vertex* start_vertex = lowest_vertex_per_column.at(pathlet.second); 
+        // Departure and Arrival column indexes
         this->left_column = pathlet.first;
         this->right_column  = pathlet.second;
         vertex* end_vertex = nullptr;
-        //If start_vertex == nullptr it means that theright extreme of tehe pathlet is not close enough to any point in the sample -> we count 0
+        //If start_vertex == nullptr it means that the right extreme of the pathlet is not close enough to any point in the sample -> we count 0. That column of the fsg is empty.
         if(start_vertex ==nullptr){
 
             return counter;
@@ -203,11 +210,15 @@ public:
 
 
         bool success = false;
+        // I need the current trajectory in order to get to know how high i have to traverse to skip to the next one., or, equivalently, if I am querying valid matches.
         id_t current_visiting_trajectory = sample.get_id_at(start_vertex->row_index);
+        // I need the last trajectory of the sample to know if I am finishing the visit of the fsg or if there is something weird going on.
         id_t last_trajectory_to_be_visited = sample.get_id_at(sample.total_size()-1);
         //std::cout<<"Started visiting trajectory "<< current_visiting_trajectory<<std::endl;
         //std::cout<<"Last trajectory "<< last_trajectory_to_be_visited<<std::endl;
+
         auto next_row = start_vertex->row_index;
+
         while (true) {
             //std::cout<<"Stuck here." <<std::endl;
             
@@ -244,22 +255,22 @@ public:
 
         return counter;
     }
-    //TODO:cambiare
+
     std::vector<vertex*> lowest_vertex_per_column;
 //============= STOP =========
 private:
+    //For Frequent trajs I could also use a different data structure, but this looks nice + i do not think the bottleneck is here
     lost::recycling_object_pool<vertex> vertex_pool;
     // List of the lowest vertices in each column
     // `.front()` corresponds to the lowest vertex in the `left_column`
     // `.back()` corresponds to the lowest vertex in the `right_column`
-    
-    
+       
     index_t left_column = 0;
     index_t right_column = 0;
     vertex* highest_in_last_col = nullptr;
     vertex* candidate_for_below_left = nullptr;
     vertex* candidate_for_left = nullptr;
-
+    
     // Advance the vertices `candidate_for_left` such that it lies at least in the given row.
     // Sets `candidate_for_below_left` to be the next free vertex down from `candidate_for_left`.
     void advance_candidate_for_left(const row_index_t &row) {
@@ -268,7 +279,7 @@ private:
             candidate_for_left = candidate_for_left->up;
         }
     }
-    
+    /*
     // Find the next vertex below `current_vertex` whose row index is at most `below_this`,
     // and which lies on a path that ends in a vertex in the column indicated by `left_column`.
     // Returns a pointer to the vertex if such a vertex was found, `nullptr` otherwise.
@@ -280,12 +291,13 @@ private:
         }
         return v_ptr;
     }
-
+    */
+    //Finds next vertex to start the search from after a match with current_visiting_trajectory is found. Returns null if there is not another eligible start vertex, ie. if there is not another start vertex above the current one.
     vertex* find_next_eligible_vertex_after_success(const vertex* start_vertex,const trajectory_t& sample, id_t& current_visiting_trajectory){
 
         
         vertex* next_vertex =start_vertex->up;
-
+        //while I have not finished the fsg and i am still in the current trajectory
         while(next_vertex != nullptr && sample.get_id_at(next_vertex->row_index) == current_visiting_trajectory ){
             
             next_vertex =next_vertex->up;
@@ -294,7 +306,7 @@ private:
 
         return next_vertex;
     }
-
+    /**
     // Extract the subtrajectory to `start_vertex`, write it into `output_trajectory` and return true,
     // unless it overlaps the subtrajectory defined by indices `left_column` and `right_column`.
     // If it overlaps this subtrajectory, return false.
@@ -385,7 +397,7 @@ private:
             && trajectory.get_id_at(row) == trajectory_id && (row < left_column || row > right_column));
         ++row;
     }
-
+    */
     bool find_match_with_pathlet_from_start_vertex(const trajectory_t& sample, vertex* start_vertex, id_t trajectory_id){
 
         int next_column_idx = this->right_column-1;
@@ -410,22 +422,20 @@ private:
 
                         next_column.push(start_vertex->left);
                         enqueue_vertical_chain( next_column, start_vertex->left,trajectory_id, sample);
-                        //std::cout <<"FInished Enqueue VCHAIN -> sf is not here"<< std::endl;
+                        
 
                     }
                     else if(start_vertex->below_left != nullptr && sample.get_id_at(start_vertex->below_left->row_index) == trajectory_id){
 
                         next_column.push(start_vertex->below_left);
                         enqueue_vertical_chain(next_column,start_vertex->below_left, trajectory_id, sample);
-                        //std::cout <<"FInished Enqueue VCHAIN -> sf is not here"<< std::endl;
+                        
 
 
                     }
 
                 }
                 else{
-                    //std::cout <<"The problem is here."<< std::endl;
-                    
                     if(start_vertex->below_left != nullptr && next_column.back()->below_left!= nullptr && start_vertex->below_left->row_index >= next_column.back()->below_left->row_index){continue;}
                     //assert(start_vertex->below_left != nullptr);
                     
@@ -435,6 +445,11 @@ private:
                         enqueue_vertical_chain(next_column,start_vertex->left, trajectory_id, sample);
                        ;
 
+                    }
+                    if(start_vertex->left == nullptr && start_vertex->below_left != nullptr &&  sample.get_id_at(start_vertex->below_left->row_index) == trajectory_id && start_vertex->below_left->row_index < next_column.back()->row_index){
+                        
+                        next_column.push(start_vertex-> below_left );
+                        enqueue_vertical_chain(next_column,start_vertex->below_left, trajectory_id, sample);
                     }
 
                 }
