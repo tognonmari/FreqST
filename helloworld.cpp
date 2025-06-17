@@ -1,48 +1,38 @@
 #include <CGAL/Dimension.h>
 #include <CGAL/Simple_cartesian.h>
 #include <iostream>
-#include <omp.h>
-#include <filesystem>
 #include "CLI11.hpp"
 #include <chrono>
 #include "free_space_graph.h"
 #include "io.h"
-#include "canonical_pathlets.h"
 #include "freq_st_algo.h"
 #include "metric_space.h"
 #include "trajectory.h"
 #include "utility"
-#include "validation.h"
+
 #include "free_space_graph_free_axis.h"
 
 using namespace frechet;
 namespace fs = std::filesystem;
 namespace chrono = std::chrono;
-using space = CGAL_metric_space<CGAL::Simple_cartesian<double>, CGAL::Dimension_tag<2>>;
 
-using bbgll_algo = subtrajectory_clustering_bbgll<space>;
+using space = CGAL_metric_space<CGAL::Simple_cartesian<double>, CGAL::Dimension_tag<2>>;
 using free_space_graph_t =  free_space_graph_free_axis<space>;
 using frequent_subtrajectory_algo_t = frequent_subtrajectory_algo<space>;
 using trajectory_t = trajectory_collection<space>;
-using validation_t = validation<space>;
-using index_t = trajectory_t::index_t;
 using distance_function_t = space::distance_function_t;
 using distance_t = distance_function_t::distance_t;
-using range_search_t = kd_tree_range_search<space>;
 
-enum class sampling_mode {
-    chernoff = 0,
-    vc_dim = 1
-};
 
 int main(int argc, char** argv){
 
     //Step 1: initialize config variables
+
     distance_t radius;
     float frequency_threshold, epsilon, delta;
     int minimum_length = 1;
     std::string infilename, outfilename, pathlet_file_name;
-    sampling_mode mode;
+
     //Step 2: parse the input parameters
     
     CLI::App app{"Frequent Subtrajectory Extraction"};
@@ -73,7 +63,8 @@ int main(int argc, char** argv){
     
     
     trajectory_t dataset = read_trajectory_from_file<space>(infilename);
-    std::cout << "NUm trajectories in the sample is "<< dataset.num_trajectories()<<std::endl;
+
+    std::cout << "Num trajectories in the sample is "<< dataset.num_trajectories()<<std::endl;
     
     
     frequent_subtrajectory_algo_t algo(dataset, pathlet_file_name, frequency_threshold, radius); 
