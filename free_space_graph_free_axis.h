@@ -187,6 +187,77 @@ public:
     
 
     // FOR FREQUENT SUBTRAJECTORIES 
+    int query_one_pathlet_over_the_sample_no_queues(const trajectory_t &sample, const subtrajectory_t &pathlet){
+
+        //assert(output_trajectories.empty());
+        
+        int counter = 0;
+        // It starts from the lowest 0 in the rightmost column of the pathlet, columns are indexed just like the points in the pathlet_mother. In the below fsg, if the pathlet is 0-2 it starts from the only zero along the lowest row.
+
+        // 0 0 0 0
+        // 0 1 0 1  
+        // 1 1 0 1
+
+        vertex* start_vertex = lowest_vertex_per_column.at(pathlet.second); 
+        // Departure and Arrival column indexes
+        this->left_column = pathlet.first;
+        this->right_column  = pathlet.second;
+        vertex* end_vertex = nullptr;
+        //If start_vertex == nullptr it means that the right extreme of the pathlet is not close enough to any point in the sample -> we count 0. That column of the fsg is empty.
+        if(start_vertex ==nullptr){
+
+            return counter;
+        }
+
+
+        bool success = false;
+        // I need the current trajectory in order to get to know how high i have to traverse to skip to the next one., or, equivalently, if I am querying valid matches.
+        id_t current_visiting_trajectory = sample.get_id_at(start_vertex->row_index);
+        // I need the last trajectory of the sample to know if I am finishing the visit of the fsg or if there is something weird going on.
+        id_t last_trajectory_to_be_visited = sample.get_id_at(sample.total_size()-1);
+        //std::cout<<"Started visiting trajectory "<< current_visiting_trajectory<<std::endl;
+        //std::cout<<"Last trajectory "<< last_trajectory_to_be_visited<<std::endl;
+
+        auto next_row = start_vertex->row_index;
+
+        while (true) {
+            //std::cout<<"Stuck here." <<std::endl;
+            
+            bool success = find_match_with_pathlet_from_start_vertex_no_queues(sample, start_vertex,current_visiting_trajectory);
+            //std::cout << "Out of the matching function=> my segmentation fault is not there"<< std::endl;
+            if(success){
+                //std::cout<< "Success"<<std::endl;
+                //std::cout<< "found match for the pathlet" << pathlet.first<< " "<< pathlet.second <<"at trajectory "<< current_visiting_trajectory << std::endl;
+                counter++;
+
+                if(current_visiting_trajectory == last_trajectory_to_be_visited ){
+                    break;
+                }
+                start_vertex = find_next_eligible_vertex_after_success(start_vertex, sample, current_visiting_trajectory); 
+                if(start_vertex == nullptr)//there's nothing above me 
+                {
+                    break;
+                }
+                current_visiting_trajectory =  sample.get_id_at(start_vertex->row_index);
+                //std::cout << "after success i am moving ato traj "<< current_visiting_trajectory<< std::endl;
+            }
+            else{
+
+                start_vertex = start_vertex->up;
+                if(start_vertex == nullptr){
+
+                    break;
+                }
+                current_visiting_trajectory =  sample.get_id_at(start_vertex->row_index);
+            }
+        }
+
+        TIME_END(query_cluster);
+
+        return counter;
+
+
+    }
     int query_one_pathlet_over_the_sample(const trajectory_t &sample, const subtrajectory_t &pathlet) {
         //assert(output_trajectories.empty());
         
@@ -251,7 +322,7 @@ public:
             }
         }
 
-        TIME_END(query_cluster);
+       
 
         return counter;
     }
@@ -409,7 +480,7 @@ private:
 
         while(!next_column.empty() && next_column_idx>leftmost_column){
 
-            current_column = next_column;
+            current_column = (next_column);
             next_column = std::queue<vertex*>();
             next_column_idx--;
             
@@ -447,7 +518,7 @@ private:
 
                     }
                     if(start_vertex->left == nullptr && start_vertex->below_left != nullptr &&  sample.get_id_at(start_vertex->below_left->row_index) == trajectory_id && start_vertex->below_left->row_index < next_column.back()->row_index){
-                        
+                        //std::cout <<" i fall here" <<std::endl;
                         next_column.push(start_vertex-> below_left );
                         enqueue_vertical_chain(next_column,start_vertex->below_left, trajectory_id, sample);
                     }
@@ -464,6 +535,85 @@ private:
         return true;
     }
 
+    bool find_match_with_pathlet_from_start_vertex_no_queues(const trajectory_t& sample, vertex* start_vertex, id_t trajectory_id){
+
+        int next_column_idx = this->right_column-1;
+        int leftmost_column = this-> left_column;
+        std::vector<vertex*> current_column;
+        current_column.reserve(sample.get_trajectory_size(trajectory_id));
+        std::vector<vertex*> next_column;
+        next_column.reserve(sample.get_trajectory_size(trajectory_id));
+        next_column.push_back(start_vertex);
+        assert(next_column.size() == 1);
+
+        while(next_column.size()!=0 && next_column_idx>leftmost_column){
+
+            current_column = (next_column);
+            std::vector<vertex*> next_column;
+            next_column.reserve(sample.get_trajectory_size(trajectory_id));
+            next_column_idx--;
+            for(int i =0; i<current_column.size(); i++){
+
+                start_vertex = current_column.at(i);
+                if(next_column.size()==0){
+
+                    if(start_vertex->left != nullptr){
+
+                        next_column.push_back(start_vertex->left);
+                        push_back_vertical_chain( next_column, start_vertex->left,trajectory_id, sample);
+                        
+
+                    }
+                    else if(start_vertex->below_left != nullptr && sample.get_id_at(start_vertex->below_left->row_index) == trajectory_id){
+
+                        next_column.push_back(start_vertex->below_left);
+                        push_back_vertical_chain(next_column,start_vertex->below_left, trajectory_id, sample);
+                        
+
+
+                    }
+
+                }
+                else{
+                    if(start_vertex->below_left != nullptr && next_column.back()->below_left!= nullptr && start_vertex->below_left->row_index >= next_column.back()->below_left->row_index){continue;}
+                    //assert(start_vertex->below_left != nullptr);
+                    
+                    assert(next_column.at(next_column.size()-1)!= nullptr);
+                    if(start_vertex->left != nullptr && start_vertex->left->row_index < next_column.back()->row_index ){
+                        next_column.push_back(start_vertex-> left );
+                        push_back_vertical_chain(next_column,start_vertex->left, trajectory_id, sample);
+                       
+
+                    }
+                    if(start_vertex->left == nullptr && start_vertex->below_left != nullptr &&  sample.get_id_at(start_vertex->below_left->row_index) == trajectory_id && start_vertex->below_left->row_index < next_column.back()->row_index){
+                        //std::cout <<" i fall here" <<std::endl;
+                        next_column.push_back(start_vertex-> below_left );
+                        push_back_vertical_chain(next_column,start_vertex->below_left, trajectory_id, sample);
+                    }
+
+                }
+
+
+            }
+
+            
+        }
+        
+        if(next_column.size()==0) {return false;}
+
+        return true;
+    }
+
+    void push_back_vertical_chain(std::vector<vertex*>& next_column, vertex* higher_column_vertex, id_t tid, const trajectory_t& sample){
+
+        vertex* sv = higher_column_vertex;
+        while(sv->below != nullptr && sample.get_id_at(sv->below->row_index) == tid){
+
+            next_column.push_back(sv->below);
+            sv = sv->below;
+        }
+
+    }
     void enqueue_vertical_chain(std::queue<vertex*>& next_column, vertex* higher_column_vertex, id_t tid, const trajectory_t& sample){
 
         vertex* sv = higher_column_vertex;
