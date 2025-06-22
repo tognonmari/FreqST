@@ -75,6 +75,48 @@ public:
         highest_in_last_col = nullptr;
         right_column = new_right_column;
     }
+    //TODO: I should add checks here to control the id at and make this always id-respecting
+    void add_zero_with_id_respecting_labels(row_index_t row_idx, trajectory_t& the_traj){
+
+        assert((highest_in_last_col == nullptr) || (highest_in_last_col->row_index < row_idx));
+        auto *new_vertex = vertex_pool.construct(row_idx);
+        if (lowest_vertex_per_column.back() == nullptr) {
+            lowest_vertex_per_column.back() = new_vertex;
+        }
+        
+        if(right_column == 0){
+            
+            new_vertex->min_label = 0;
+
+        }
+        if (right_column > 0) {
+            
+            advance_candidate_for_left(row_idx);
+            //Add the link to candidat_for_left onlyi if they have the same id 
+            if (candidate_for_left != nullptr && candidate_for_left->row_index == row_idx) {
+                new_vertex->left = candidate_for_left;
+                new_vertex->label_left = candidate_for_left->min_label;
+            }
+            if (candidate_for_below_left != nullptr && candidate_for_below_left->row_index == row_idx - 1 && the_traj.get_id_at(candidate_for_below_left->row_index)==the_traj.get_id_at(row_idx)) {
+                new_vertex->below_left = candidate_for_below_left;
+                new_vertex->label_below_left = candidate_for_below_left->min_label;
+            }
+        }
+        if (highest_in_last_col != nullptr) {
+            new_vertex->below = highest_in_last_col;
+            new_vertex->label_below = (highest_in_last_col->row_index == row_idx - 1 && the_traj.get_id_at(highest_in_last_col->row_index)==the_traj.get_id_at(row_idx)) ? highest_in_last_col->min_label
+                                                                                    : vertex::no_edge_label;
+            highest_in_last_col->up = new_vertex;
+        }
+        highest_in_last_col = new_vertex;
+        new_vertex->min_label = std::min({new_vertex->label_left,
+                                          new_vertex->label_below_left,
+                                          new_vertex->label_below,
+                                          right_column});
+
+
+    }
+
 
     void add_zero(row_index_t row_idx) {
         INCREMENT_COUNT(zeroes);
@@ -258,6 +300,77 @@ public:
 
 
     }
+
+    int query_one_pathlet_over_the_sample_with_labels(const trajectory_t &sample, const subtrajectory_t &pathlet){
+
+        int counter = 0;
+        // It starts from the lowest 0 in the rightmost column of the pathlet, columns are indexed just like the points in the pathlet_mother. In the below fsg, if the pathlet is 0-2 it starts from the only zero along the lowest row.
+
+        // 0 0 0 0
+        // 0 1 0 1  
+        // 1 1 0 1
+
+        vertex* start_vertex = lowest_vertex_per_column.at(pathlet.second); 
+        // Departure and Arrival column indexes
+        this->left_column = pathlet.first;
+        this->right_column  = pathlet.second;
+        vertex* end_vertex = nullptr;
+        //If start_vertex == nullptr it means that the right extreme of the pathlet is not close enough to any point in the sample -> we count 0. That column of the fsg is empty.
+        if(start_vertex ==nullptr){
+
+            return counter;
+        }
+
+
+        bool success = false;
+        // I need the current trajectory in order to get to know how high i have to traverse to skip to the next one., or, equivalently, if I am querying valid matches.
+        id_t current_visiting_trajectory = sample.get_id_at(start_vertex->row_index);
+        // I need the last trajectory of the sample to know if I am finishing the visit of the fsg or if there is something weird going on.
+        id_t last_trajectory_to_be_visited = sample.get_id_at(sample.total_size()-1);
+        //std::cout<<"Started visiting trajectory "<< current_visiting_trajectory<<std::endl;
+        //std::cout<<"Last trajectory "<< last_trajectory_to_be_visited<<std::endl;
+
+        auto next_row = start_vertex->row_index;
+
+        while (true) {
+            //std::cout<<"Stuck here." <<std::endl;
+            
+            bool success = false;//find_match_with_pathlet_from_start_vertex_no_queues(sample, start_vertex,current_visiting_trajectory);
+            if(start_vertex->min_label <=pathlet.first){
+                success = true;
+            }
+            //std::cout << "Out of the matching function=> my segmentation fault is not there"<< std::endl;
+            if(success){
+                //std::cout<< "Success"<<std::endl;
+                std::cout<< "found match for the pathlet" << pathlet.first<< " "<< pathlet.second <<"at trajectory "<< current_visiting_trajectory << std::endl;
+                counter++;
+
+                if(current_visiting_trajectory == last_trajectory_to_be_visited ){
+                    break;
+                }
+                start_vertex = find_next_eligible_vertex_after_success(start_vertex, sample, current_visiting_trajectory); 
+                if(start_vertex == nullptr)//there's nothing above me 
+                {
+                    break;
+                }
+                current_visiting_trajectory =  sample.get_id_at(start_vertex->row_index);
+                //std::cout << "after success i am moving ato traj "<< current_visiting_trajectory<< std::endl;
+            }
+            else{
+
+                start_vertex = start_vertex->up;
+                if(start_vertex == nullptr){
+
+                    break;
+                }
+                current_visiting_trajectory =  sample.get_id_at(start_vertex->row_index);
+            }
+        }
+
+        return counter;
+
+    }
+
     int query_one_pathlet_over_the_sample(const trajectory_t &sample, const subtrajectory_t &pathlet) {
         //assert(output_trajectories.empty());
         
@@ -412,7 +525,7 @@ private:
         }
         TIME_END(extract_trajectory); return true;
     }
-
+*/
     // Extract the subtrajectory to `start_vertex`, write it into `output_trajectory` and return.
     // Writes the resulting vertex in the left row to `output_vertex`.
     // Returns `{true, next_row}` if successful, `{false, next_row}` if no valid subtrajectory was found.
@@ -455,6 +568,7 @@ private:
         }
         TIME_END(extract_trajectory); return {true, output_trajectory.second, start_vertex};
     }
+    /*
     // Optimize the starting point of `subtrajectory` by walking down from end_vertex in the leftmost column,
     // without crossing the row of `next_start_vertex` or violating id constraints.
     void optimize_in_left_column(const trajectory_t &trajectory, subtrajectory_t &subtrajectory, vertex *end_vertex, vertex* const next_start_vertex) const {
@@ -600,7 +714,7 @@ private:
         }
         
         if(next_column.size()==0) {return false;}
-
+        
         return true;
     }
 
