@@ -364,8 +364,8 @@ class frequent_subtrajectory_algo{
 
                 trajectory_t pathlet_mother = this->read_next_transaction_from_file(input_stream);
 
-                //std::cout <<"Parsed a transaction."<<std::endl;
-                //std::cout<<" The transaction has ID "<<pathlet_mother.get_id_at(pathlet_mother.get_actual_size()-1)<<std::endl;
+                std::cout <<"Parsed a transaction."<<std::endl;
+                std::cout<<" The transaction has ID "<<pathlet_mother.get_id_at(pathlet_mother.get_actual_size()-1)<<std::endl;
                 //std::cout <<" I have this many points : "<< pathlet_mother.get_actual_size()<<std::endl;
 
                 // BUILD THE PATHLETS OVER THE PARSED TRAJECTORY -- TODO: MODIFY MIN LENGTH, BUT SOMEHOW MAKE IT COMPLIANT WITH THE BOUNDS
