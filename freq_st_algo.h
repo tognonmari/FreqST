@@ -47,7 +47,7 @@ class freq_subtrajectory_sampler{
 
             (this->sampled_trajs_ids).clear();
 
-            int sample_size = (int) (3 / (epsilon * epsilon)) * log(2 * this->total_pathlet_number_respecting_ids() / delta);
+            int sample_size = (int) (4 / (epsilon * epsilon)) * log(2 * this->total_pathlet_number_respecting_ids() / delta);
             std::cout << "Chernoff sample size with espilon "<<epsilon << ",delta "<< delta <<" is: "<< sample_size <<std::endl;
             //Step 2: assert sampling is worthwhile
             if(sample_size > the_trajectory.num_trajectories()){
@@ -70,7 +70,7 @@ class freq_subtrajectory_sampler{
 
             (this->sampled_trajs_ids).clear();
 
-            int sample_size = (int) (2 / (epsilon * epsilon)) * (this->vc_dim() + log(1 / delta));
+            int sample_size = (int) (2 / (epsilon * epsilon)) * (this->vc_dim() + log(2 / delta));
             std::cout << "VCdim sample size with espilon "<<epsilon << ",  delta "<< delta <<", radius "<< distance_threshold<< " is: "<< sample_size <<std::endl;
             //Step 2: assert sampling is worthwhile
             if(sample_size > the_trajectory.num_trajectories()){
@@ -90,7 +90,7 @@ class freq_subtrajectory_sampler{
             //Step 1: compute sample size according to Chernoff rule. 
             (this->sampled_trajs_ids).clear();
 
-            int sample_size = (int) (2 / (epsilon * epsilon)) * (this->rough_vc_dim() + log(1 / delta));
+            int sample_size = (int) (2 / (epsilon * epsilon)) * (this->rough_vc_dim() + log(2 / delta));
             std::cout << " Rough VCdim sample size with espilon "<<epsilon << ",  delta "<< delta <<", radius "<< distance_threshold<< " is: "<< sample_size <<std::endl;
             //Step 2: assert sampling is worthwhile
             if(sample_size > the_trajectory.num_trajectories()){
@@ -141,7 +141,7 @@ class freq_subtrajectory_sampler{
         int counter;
         
         for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-            std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+            //std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
 
             
 
@@ -256,7 +256,7 @@ class freq_subtrajectory_sampler{
 
         for (id_t i = 0; i < the_trajectory.num_trajectories(); i ++){
 
-            total += 2 * ceil(log2( the_trajectory.get_trajectory_size(i) / min_length));
+            total += 2 * ceil(( the_trajectory.get_trajectory_size(i) / min_length));
 
         }
 
@@ -377,7 +377,7 @@ class frequent_subtrajectory_algo{
                 
                 //POPULATE FREE SPACE DIAGRAM : THE SAMPLE IS ALONG THE Y-AXIS, THE TRANSACTION WHICH BAERS THE PATHLETS FOR THE CURRENT TREE IS ALONG THE X-AXIS
 
-                this->populate_all_columns(fsg, pathlet_mother);
+                this->populate_all_columns_with_labels(fsg, pathlet_mother);
 
                 //std::cout <<"Populated the columns."<<std::endl;
                 
@@ -579,7 +579,7 @@ class frequent_subtrajectory_algo{
 
                     }
 
-                    int count = fsg.query_one_pathlet_over_the_sample_no_queues(sample, pn.getPathlet()); //SF IS HERE
+                    int count = fsg.query_one_pathlet_over_the_sample_with_labels(sample, pn.getPathlet()); //SF IS HERE
                     
                     if(count < this->integer_frequency_threshold){
                         
@@ -604,6 +604,22 @@ class frequent_subtrajectory_algo{
 
 
         }
+        void populate_all_columns_with_labels(free_space_graph_t& fsg, const trajectory_t& pathlet_mother){
+            int num_col = pathlet_mother.get_actual_size();
+
+            for (int j = 0; j< num_col; j++){
+
+                populate_column_with_labels(fsg, pathlet_mother[j], this->distance_threshold, j);
+                if(j < num_col -1){
+
+                    fsg.new_column();
+
+                }
+            }
+
+            return;
+
+        }
         //MATERIALIZES THE NON-ZERO NODES IN THE FSG + THE EDGES TO TRAVERSE IT 
         void populate_all_columns(free_space_graph_t& fsg, const trajectory_t& pathlet_mother){
 
@@ -621,7 +637,28 @@ class frequent_subtrajectory_algo{
 
             return;
         }
+        void populate_column_with_labels(free_space_graph_t &fsg, const point_t& point, const distance_t& query_distance, index_t column_index ){
 
+            
+            int zeroes = 0;
+            float sq_dist = query_distance * query_distance;
+            int highest_index = 0;
+            int iterations =0;
+            //ARTIGIANALE:
+            for (int i = 0; i< sample.get_actual_size(); i++){
+                iterations++;
+                auto d_ij = distance_function_t{}(sample[i], point);
+                if (d_ij <= sq_dist ){
+
+                    fsg.add_zero_with_id_respecting_labels(i, this->sample);
+                    zeroes++;
+
+                } 
+            }
+            std::cout<< "i create columns without sf"<< std::endl;
+            //assert(iterations == sample.get_actual_size());
+
+        }
         // MATERIALIZES A SINGLE COLUMN OF THE FSG, i.e. the nodes for which 
         void populate_column(free_space_graph_t &fsg, const point_t& point, const distance_t& query_distance, index_t column_index ){
 
