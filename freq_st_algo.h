@@ -6,6 +6,10 @@
 #include <list>
 #include <vector>
 #include <random>
+#include <algorithm>
+#include <random>
+
+
 
 #include "free_space_graph_free_axis.h"
 #include "kdtree_range_search.h"
@@ -47,7 +51,7 @@ class freq_subtrajectory_sampler{
 
             (this->sampled_trajs_ids).clear();
 
-            int sample_size = (int) (4 / (epsilon * epsilon)) * log(2 * this->total_pathlet_number_respecting_ids() / delta);
+            int sample_size = (int) (3 / (epsilon * epsilon)) * log(2 * this->total_pathlet_number_respecting_ids() / delta);
             std::cout << "Chernoff sample size with espilon "<<epsilon << ",delta "<< delta <<" is: "<< sample_size <<std::endl;
             //Step 2: assert sampling is worthwhile
             if(sample_size > the_trajectory.num_trajectories()){
@@ -271,11 +275,19 @@ class freq_subtrajectory_sampler{
             sampled_trajs_ids.clear();
 
         }
+        std::vector<id_t> indexes;
         int n = the_trajectory.num_trajectories();
+        for (int i = 0; i< n; i++){
+
+            indexes.push_back(i);
+
+        }
+        auto rng = std::default_random_engine {};
+        std::ranges::shuffle(indexes, rng);
         // Extract sampled ids
         for (int i = 0; i < sample_size; i++){
 
-            sampled_trajs_ids.push_back((id_t)(mt())% n);
+            sampled_trajs_ids.push_back(indexes.at(i));
 
         }
 
@@ -294,6 +306,10 @@ class freq_subtrajectory_sampler{
             else{
                 last_read_trajectory = sampled_trajs_ids.at(j);
                 repetitions = 0;
+            }
+            if(repetitions > 0){
+
+                std::cout<< "I have repetitions despite the shuffle"<< std::endl;
             }
         }
         std::cout<< "I have finished the method to get the ids"<< std::endl;
