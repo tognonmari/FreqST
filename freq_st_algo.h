@@ -47,7 +47,7 @@ class freq_subtrajectory_sampler{
 
             (this->sampled_trajs_ids).clear();
 
-            int sample_size = (int) (4 / (epsilon * epsilon)) * log(2 * this->total_pathlet_number_respecting_ids() / delta);
+            int sample_size = (int) (3 / (epsilon * epsilon)) * log(2 * this->total_pathlet_number_respecting_ids() / delta);
             std::cout << "Chernoff sample size with espilon "<<epsilon << ",delta "<< delta <<" is: "<< sample_size <<std::endl;
             //Step 2: assert sampling is worthwhile
             if(sample_size > the_trajectory.num_trajectories()){
@@ -107,7 +107,7 @@ class freq_subtrajectory_sampler{
 
         void dump_sample_to_file(std::string filename){
 
-            std::cout << "Started dumping the sample to a file"<< std::endl;
+            //std::cout << "Started dumping the sample to a file"<< std::endl;
             assert(!sampled_trajs_ids.empty());
             std::ofstream fout(filename);
             for (int j = 0; j< sampled_trajs_ids.size(); j++){
@@ -141,10 +141,11 @@ class freq_subtrajectory_sampler{
         int counter;
         
         for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-            //std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+            if(i%10000 == 0){
+                
+            std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
 
-            
-
+            }
             if(the_trajectory.get_id_at(i) == last_seen_trajectory){
 
                 counter += search.search(i, this->distance_threshold).size();
@@ -296,7 +297,7 @@ class freq_subtrajectory_sampler{
                 repetitions = 0;
             }
         }
-        std::cout<< "I have finished the method to get the ids"<< std::endl;
+        //std::cout<< "I have finished the method to get the ids"<< std::endl;
         return;
     }
 
@@ -655,7 +656,7 @@ class frequent_subtrajectory_algo{
 
                 } 
             }
-            std::cout<< "i create columns without sf"<< std::endl;
+            //std::cout<< "i create columns without sf"<< std::endl;
             //assert(iterations == sample.get_actual_size());
 
         }
