@@ -6,6 +6,10 @@
 #include <list>
 #include <vector>
 #include <random>
+#include <algorithm>
+#include <random>
+
+
 
 #include "free_space_graph_free_axis.h"
 #include "kdtree_range_search.h"
@@ -272,11 +276,19 @@ class freq_subtrajectory_sampler{
             sampled_trajs_ids.clear();
 
         }
+        std::vector<id_t> indexes;
         int n = the_trajectory.num_trajectories();
+        for (int i = 0; i< n; i++){
+
+            indexes.push_back(i);
+
+        }
+        auto rng = std::default_random_engine {};
+        std::ranges::shuffle(indexes, rng);
         // Extract sampled ids
         for (int i = 0; i < sample_size; i++){
 
-            sampled_trajs_ids.push_back((id_t)(mt())% n);
+            sampled_trajs_ids.push_back(indexes.at(i));
 
         }
 
@@ -295,6 +307,10 @@ class freq_subtrajectory_sampler{
             else{
                 last_read_trajectory = sampled_trajs_ids.at(j);
                 repetitions = 0;
+            }
+            if(repetitions > 0){
+
+                std::cout<< "I have repetitions despite the shuffle"<< std::endl;
             }
         }
         //std::cout<< "I have finished the method to get the ids"<< std::endl;
