@@ -342,7 +342,7 @@ public:
             //std::cout << "Out of the matching function=> my segmentation fault is not there"<< std::endl;
             if(success){
                 //std::cout<< "Success"<<std::endl;
-                std::cout<< "found match for the pathlet" << pathlet.first<< " "<< pathlet.second <<"at trajectory "<< current_visiting_trajectory << std::endl;
+                //std::cout<< "found match for the pathlet" << pathlet.first<< " "<< pathlet.second <<"at trajectory "<< current_visiting_trajectory << std::endl;
                 counter++;
 
                 if(current_visiting_trajectory == last_trajectory_to_be_visited ){
