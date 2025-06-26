@@ -671,6 +671,7 @@ class frequent_subtrajectory_algo{
 
                 } 
             }
+            std::cout << zeroes<< std::endl;
             //std::cout<< "i create columns without sf"<< std::endl;
             //assert(iterations == sample.get_actual_size());
 
@@ -683,7 +684,9 @@ class frequent_subtrajectory_algo{
             int highest_index = 0;
             int iterations =0;
             //ARTIGIANALE:
-            for (const auto idx: search.search_by_point(point, query_distance)) {
+            
+            for (const auto idx: search.search_by_point(point, query_distance*query_distance)) {
+
                 fsg.add_zero_with_id_respecting_labels(idx, this->sample);
                 zeroes++;
             }
