@@ -9,7 +9,7 @@
 #include "metric_space.h"
 #include "trajectory.h"
 #include "utility"
-
+#include "kdtree_range_search.h"
 #include "free_space_graph_free_axis.h"
 
 using namespace frechet;
@@ -22,7 +22,7 @@ using frequent_subtrajectory_algo_t = frequent_subtrajectory_algo<space>;
 using trajectory_t = trajectory_collection<space>;
 using distance_function_t = space::distance_function_t;
 using distance_t = distance_function_t::distance_t;
-
+using range_search_t = kd_tree_range_search<space>;
 
 int main(int argc, char** argv){
 
@@ -66,8 +66,9 @@ int main(int argc, char** argv){
 
     std::cout << "Num trajectories in the sample is "<< dataset.num_trajectories()<<std::endl;
     
+    range_search_t rs(dataset);
     
-    frequent_subtrajectory_algo_t algo(dataset, pathlet_file_name, frequency_threshold, radius); 
+    frequent_subtrajectory_algo_t algo(dataset, rs, pathlet_file_name, frequency_threshold, radius); 
     
     auto start = chrono::high_resolution_clock::now();
     algo.compute_all_frequent_pathlets();

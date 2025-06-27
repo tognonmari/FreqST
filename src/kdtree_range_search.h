@@ -64,12 +64,12 @@ public:
 
     result_t search_by_point(point_t point, distance_t distance){
         auto search_distance_unsquared = std::sqrt(distance);
-        std::cout <<"Computed threshold."<<std::endl;
+        //std::cout <<"Computed threshold."<<std::endl;
         auto sphere = sphere_t{point,
                                   1.1 * search_distance_unsquared,
                                   0.1 * search_distance_unsquared, // TODO: make fuzziness a parameter
                                   search_traits_obj};
-        std::cout <<"Built the sphere."<<std::endl;
+        //std::cout <<"Built the sphere."<<std::endl;
         result_t result_tmp;
         tree.search(std::back_inserter(result_tmp), sphere);
         

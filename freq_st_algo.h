@@ -143,7 +143,7 @@ class freq_subtrajectory_sampler{
         std::vector<int> c;
         index_t last_seen_trajectory = the_trajectory.get_id_at(0);
         int counter;
-        
+        int total_distances = 0;
         for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
             if(i%10000 == 0){
                 
@@ -152,7 +152,9 @@ class freq_subtrajectory_sampler{
             }
             if(the_trajectory.get_id_at(i) == last_seen_trajectory){
 
-                counter += search.search(i, this->distance_threshold).size();
+                int ss = search.search(i, this->distance_threshold).size();
+                counter += ss;
+                total_distances += ss;
 
             }
             else{
@@ -162,13 +164,15 @@ class freq_subtrajectory_sampler{
                 //initialize the set again 
                 counter = 0;
                 last_seen_trajectory = the_trajectory.get_id_at(i);
-                counter += search.search(i, this->distance_threshold).size();
+                int ss = search.search(i, this->distance_threshold).size();
+                counter += ss;
                 //add info for the current point
 
 
             }
 
         }  
+        std::cout<<total_distances << std::endl;
         std::sort(c.begin(),c.end(), std::greater<>());
 
         int vc_dim = 0;
@@ -353,21 +357,17 @@ class frequent_subtrajectory_algo{
 
     public:
 
-        frequent_subtrajectory_algo(trajectory_t sampled_traj, std::string dataset_file, float frequency_threshold, distance_t distance_thresh) : search(sampled_traj){
+        frequent_subtrajectory_algo(trajectory_t sampled_traj, range_search_t& search, std::string dataset_file, float frequency_threshold, distance_t distance_thresh) : search(search){
             this->sample = sampled_traj;
             this->dataset_location = dataset_file;
             this->integer_frequency_threshold = ceil(frequency_threshold * this->sample.num_trajectories());
             std::cout << "THE INTEGER FREQ THRESHOLD IS "<< this->integer_frequency_threshold<<std::endl;
             this-> last_parsed_trajectory = -1;
             this-> distance_threshold = distance_thresh;
+            
+            
         }
 
-        void populate_range_search_tree_with_sample_points(){
-
-            range_search_t rs(sample);
-            this->search = rs;
-            return;
-        }
 
         void compute_all_frequent_pathlets(){
 
@@ -626,7 +626,7 @@ class frequent_subtrajectory_algo{
 
             for (int j = 0; j< num_col; j++){
 
-                populate_column_with_labels(fsg, pathlet_mother[j], this->distance_threshold, j);
+                populate_column_with_labels_and_range_search(fsg, pathlet_mother[j], this->distance_threshold, j);
                 if(j < num_col -1){
 
                     fsg.new_column();
@@ -664,7 +664,7 @@ class frequent_subtrajectory_algo{
             //ARTIGIANALE:
             for (int i = 0; i< sample.get_actual_size(); i++){
                 iterations++;
-                auto d_ij = distance_function_t{}(sample[i], point);
+                auto d_ij = distance_function_t{}(sample[i], point); //FI
                 if (d_ij <= sq_dist ){
 
                     fsg.add_zero_with_id_respecting_labels(i, this->sample);
@@ -672,6 +672,39 @@ class frequent_subtrajectory_algo{
 
                 } 
             }
+            std::cout << zeroes<< std::endl;
+            //std::cout<< "i create columns without sf"<< std::endl;
+            //assert(iterations == sample.get_actual_size());
+
+        }
+        void populate_column_with_labels_and_range_search(free_space_graph_t &fsg, const point_t& point, const distance_t& query_distance, index_t column_index ){
+
+            
+            int zeroes = 0;
+            //float sq_dist = query_distance * query_distance;
+            int highest_index = 0;
+            int iterations =0;
+            //ARTIGIANALE:
+            
+            for (const auto idx: search.search_by_point(point, query_distance*query_distance)) {
+
+                fsg.add_zero_with_id_respecting_labels(idx, this->sample);
+                zeroes++;
+            }
+            /*
+            for (int i = 0; i< sample.get_actual_size(); i++){
+                iterations++;
+                auto d_ij = distance_function_t{}(sample[i], point); //FI
+                if (d_ij <= sq_dist ){
+
+                    fsg.add_zero_with_id_respecting_labels(i, this->sample);
+                    zeroes++;
+
+                } 
+            }
+            
+            */
+            
             //std::cout<< "i create columns without sf"<< std::endl;
             //assert(iterations == sample.get_actual_size());
 
@@ -735,7 +768,7 @@ class frequent_subtrajectory_algo{
         }
 
         trajectory_t sample;
-        range_search_t search;
+        range_search_t& search;
         std::string dataset_location;
         id_t last_parsed_trajectory;
         distance_t distance_threshold;
