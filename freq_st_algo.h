@@ -412,19 +412,19 @@ class frequent_subtrajectory_algo{
 
             //open full dataset file 
             std::ifstream input_stream(this->dataset_location);
-            std::cout <<"Starting reading the transactions."<<std::endl;
+            //std::cout <<"Starting reading the transactions."<<std::endl;
             while(!input_stream.eof()){
 
                 trajectory_t pathlet_mother = this->read_next_transaction_from_file(input_stream);
                 //std::cout <<"Parsed a transaction."<<std::endl;
                 //std::cout<<" The transaction has ID "<<pathlet_mother.get_id_at(pathlet_mother.get_actual_size()-1)<<std::endl;
-                std::cout <<" I have this many points : "<< pathlet_mother.get_actual_size()<<std::endl;
+                //std::cout <<" I have this many points : "<< pathlet_mother.get_actual_size()<<std::endl;
                 BinaryPathletTree pathlet_tree(pathlet_mother, pathlet_mother.get_id_at(0),floor(log2(pathlet_mother.total_size())) + 1,1);
                 
                 free_space_graph_t fsg(0);
                 
                 //for all the columns of the bst populate the column
-                this->populate_all_columns(fsg, pathlet_mother);
+                this->populate_all_columns_with_labels(fsg, pathlet_mother);
                 std::cout <<"Populated the columns."<<std::endl;
                 //maybe i need to rewrite the kd tree to access with the coordinates directly
                 this->collect_maximal_frequent_pathlets(fsg, pathlet_tree);
@@ -488,7 +488,7 @@ class frequent_subtrajectory_algo{
                     }
                     
                     //FIND THE NUMBER OF TRAJECTORIES IN THE SAMPLE (i.e. along the Y-AXIS), WHICH MATCH AGAINST THE PATHLET (count)
-                    int count = fsg.query_one_pathlet_over_the_sample(sample, pn.getPathlet()); 
+                    int count = fsg.query_one_pathlet_over_the_sample_with_labels(sample, pn.getPathlet()); 
                     
                     //IF THE PATHLET IS FREQUENT, SAVE ITS FRERQUENCY. OTHERWISE MARK IT (AND ALL OF ITS ANCESTORS) AS INFREQUENT
                     if(count < this->integer_frequency_threshold){
@@ -625,7 +625,7 @@ class frequent_subtrajectory_algo{
 
             for (int j = 0; j< num_col; j++){
 
-                populate_column_with_labels_and_range_search(fsg, pathlet_mother[j], this->distance_threshold, j);
+                populate_column_with_labels(fsg, pathlet_mother[j], this->distance_threshold, j);
                 if(j < num_col -1){
 
                     fsg.new_column();
@@ -643,7 +643,7 @@ class frequent_subtrajectory_algo{
 
             for (int j = 0; j< num_col; j++){
 
-                populate_column(fsg, pathlet_mother[j], this->distance_threshold, j);
+                populate_column_with_labels(fsg, pathlet_mother[j], this->distance_threshold, j);
                 if(j < num_col -1){
 
                     fsg.new_column();
@@ -671,7 +671,7 @@ class frequent_subtrajectory_algo{
 
                 } 
             }
-            std::cout << zeroes<< std::endl;
+            //std::cout << zeroes<< std::endl;
             //std::cout<< "i create columns without sf"<< std::endl;
             //assert(iterations == sample.get_actual_size());
 
