@@ -345,8 +345,7 @@ class frequent_subtrajectory_algo{
         using distance_t = distance_function_t::distance_t;
         using binary_pathlet_tree_t = BinaryPathletTree<space>;
         using range_search_t = kd_tree_range_search<space>;
-
-    private:
+    
         struct frequent_pathlet{
 
             std::pair<index_t,index_t> extremes;
@@ -356,11 +355,15 @@ class frequent_subtrajectory_algo{
         };
 
     public:
+        std::vector<frequent_pathlet> freq_pathlets;
 
-        frequent_subtrajectory_algo(trajectory_t sampled_traj, range_search_t& search, std::string dataset_file, float frequency_threshold, distance_t distance_thresh) : search(search){
+        
+        frequent_subtrajectory_algo(trajectory_t& sampled_traj, range_search_t& search, std::string dataset_file, float frequency_threshold, distance_t distance_thresh) : search(search){
             this->sample = sampled_traj;
             this->dataset_location = dataset_file;
-            this->integer_frequency_threshold = ceil(frequency_threshold * this->sample.num_trajectories());
+            std::cout << sampled_traj.get_id_at(sampled_traj.total_size()-1)<< std::endl;
+            std::cout<<"Frequency threshold is "<< frequency_threshold << std::endl;
+            this->integer_frequency_threshold = ceil(frequency_threshold *( (int)sampled_traj.get_id_at(sampled_traj.total_size()-1)));
             std::cout << "THE INTEGER FREQ THRESHOLD IS "<< this->integer_frequency_threshold<<std::endl;
             this-> last_parsed_trajectory = -1;
             this-> distance_threshold = distance_thresh;
@@ -413,20 +416,20 @@ class frequent_subtrajectory_algo{
 
             //open full dataset file 
             std::ifstream input_stream(this->dataset_location);
-            std::cout <<"Starting reading the transactions."<<std::endl;
+            //std::cout <<"Starting reading the transactions."<<std::endl;
             while(!input_stream.eof()){
 
                 trajectory_t pathlet_mother = this->read_next_transaction_from_file(input_stream);
                 //std::cout <<"Parsed a transaction."<<std::endl;
                 //std::cout<<" The transaction has ID "<<pathlet_mother.get_id_at(pathlet_mother.get_actual_size()-1)<<std::endl;
-                std::cout <<" I have this many points : "<< pathlet_mother.get_actual_size()<<std::endl;
+                //std::cout <<" I have this many points : "<< pathlet_mother.get_actual_size()<<std::endl;
                 BinaryPathletTree pathlet_tree(pathlet_mother, pathlet_mother.get_id_at(0),floor(log2(pathlet_mother.total_size())) + 1,1);
                 
                 free_space_graph_t fsg(0);
                 
                 //for all the columns of the bst populate the column
-                this->populate_all_columns(fsg, pathlet_mother);
-                std::cout <<"Populated the columns."<<std::endl;
+                this->populate_all_columns_with_labels(fsg, pathlet_mother);
+                //std::cout <<"Populated the columns."<<std::endl;
                 //maybe i need to rewrite the kd tree to access with the coordinates directly
                 this->collect_maximal_frequent_pathlets(fsg, pathlet_tree);
 
@@ -489,7 +492,7 @@ class frequent_subtrajectory_algo{
                     }
                     
                     //FIND THE NUMBER OF TRAJECTORIES IN THE SAMPLE (i.e. along the Y-AXIS), WHICH MATCH AGAINST THE PATHLET (count)
-                    int count = fsg.query_one_pathlet_over_the_sample(sample, pn.getPathlet()); 
+                    int count = fsg.query_one_pathlet_over_the_sample_with_labels(sample, pn.getPathlet()); 
                     
                     //IF THE PATHLET IS FREQUENT, SAVE ITS FRERQUENCY. OTHERWISE MARK IT (AND ALL OF ITS ANCESTORS) AS INFREQUENT
                     if(count < this->integer_frequency_threshold){
@@ -626,7 +629,7 @@ class frequent_subtrajectory_algo{
 
             for (int j = 0; j< num_col; j++){
 
-                populate_column_with_labels_and_range_search(fsg, pathlet_mother[j], this->distance_threshold, j);
+                populate_column_with_labels(fsg, pathlet_mother[j], this->distance_threshold, j);
                 if(j < num_col -1){
 
                     fsg.new_column();
@@ -644,7 +647,7 @@ class frequent_subtrajectory_algo{
 
             for (int j = 0; j< num_col; j++){
 
-                populate_column(fsg, pathlet_mother[j], this->distance_threshold, j);
+                populate_column_with_labels(fsg, pathlet_mother[j], this->distance_threshold, j);
                 if(j < num_col -1){
 
                     fsg.new_column();
@@ -773,7 +776,7 @@ class frequent_subtrajectory_algo{
         id_t last_parsed_trajectory;
         distance_t distance_threshold;
         int integer_frequency_threshold;
-        std::vector<frequent_pathlet> freq_pathlets;
+        
 };
 
 
