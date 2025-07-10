@@ -14,12 +14,12 @@
 #include "utility"
 #include "validation.h"
 #include "free_space_graph_free_axis.h"
-
+#include <chrono>
 using namespace frechet;
-
+namespace chrono = std::chrono;
 using space = CGAL_metric_space<CGAL::Simple_cartesian<double>, CGAL::Dimension_tag<2>>;
 
-using bbgll_algo = subtrajectory_clustering_bbgll<space>;
+
 using free_space_graph_t =  free_space_graph_free_axis<space>;
 using frequent_subtrajectory_algo_t = frequent_subtrajectory_algo<space>;
 using trajectory_t = trajectory_collection<space>;
@@ -75,14 +75,21 @@ int main(int argc, char** argv){
     CLI11_PARSE(app, argc, argv);   
 
 
-    
+    std::cout << "your seed is : " << seed <<std::endl;
     
     trajectory_t dataset = read_trajectory_from_file<space>(infilename);
     freq_subtrajectory_sampler<space> sampler(dataset, epsilon, delta, radius, minimum_length, seed );
-    sampler.generate_chernoff_sample();
-    sampler.dump_sample_to_file(std::format("{}/chernoff_{}_{}_{}.txt", outfiledir, epsilon, delta, seed)); 
-    sampler.generate_vc_sample();
-    sampler.dump_sample_to_file(std::format("{}/vc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
+    //sampler.generate_fixed_size_sample(23000);
+    //sampler.dump_sample_to_file(std::format("./berlin/fixed_size_sample_23000.txt"));
+    //sampler.generate_chernoff_sample();
+    //sampler.dump_sample_to_file(std::format("{}/chernoff_{}_{}_{}.txt", outfiledir, epsilon, delta, seed)); 
+    //sampler.generate_vc_sample();
+    auto start = chrono::high_resolution_clock::now();
+    sampler.generate_rough_vc_sample();
+    auto end = chrono::high_resolution_clock::now();
+    auto duration = duration_cast<chrono::milliseconds>(end - start);
+    std::cout << "TIME: "<<duration.count() << std::endl;
+    //sampler.dump_sample_to_file(std::format("{}/vc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
     //frequent_subtrajectory_algo_t algo(dataset, infilename, 0.4, 50); 
     //algo.populate_range_search_tree_with_sample_points();
 

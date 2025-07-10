@@ -344,8 +344,7 @@ class frequent_subtrajectory_algo{
         using distance_t = distance_function_t::distance_t;
         using binary_pathlet_tree_t = BinaryPathletTree<space>;
         using range_search_t = kd_tree_range_search<space>;
-
-    private:
+    
         struct frequent_pathlet{
 
             std::pair<index_t,index_t> extremes;
@@ -355,11 +354,15 @@ class frequent_subtrajectory_algo{
         };
 
     public:
+        std::vector<frequent_pathlet> freq_pathlets;
 
-        frequent_subtrajectory_algo(trajectory_t sampled_traj, range_search_t& search, std::string dataset_file, float frequency_threshold, distance_t distance_thresh) : search(search){
+        
+        frequent_subtrajectory_algo(trajectory_t& sampled_traj, range_search_t& search, std::string dataset_file, float frequency_threshold, distance_t distance_thresh) : search(search){
             this->sample = sampled_traj;
             this->dataset_location = dataset_file;
-            this->integer_frequency_threshold = ceil(frequency_threshold * this->sample.num_trajectories());
+            std::cout << sampled_traj.get_id_at(sampled_traj.total_size()-1)<< std::endl;
+            std::cout<<"Frequency threshold is "<< frequency_threshold << std::endl;
+            this->integer_frequency_threshold = ceil(frequency_threshold *( (int)sampled_traj.get_id_at(sampled_traj.total_size()-1)));
             std::cout << "THE INTEGER FREQ THRESHOLD IS "<< this->integer_frequency_threshold<<std::endl;
             this-> last_parsed_trajectory = -1;
             this-> distance_threshold = distance_thresh;
@@ -425,7 +428,7 @@ class frequent_subtrajectory_algo{
                 
                 //for all the columns of the bst populate the column
                 this->populate_all_columns_with_labels(fsg, pathlet_mother);
-                std::cout <<"Populated the columns."<<std::endl;
+                //std::cout <<"Populated the columns."<<std::endl;
                 //maybe i need to rewrite the kd tree to access with the coordinates directly
                 this->collect_maximal_frequent_pathlets(fsg, pathlet_tree);
 
@@ -772,7 +775,7 @@ class frequent_subtrajectory_algo{
         id_t last_parsed_trajectory;
         distance_t distance_threshold;
         int integer_frequency_threshold;
-        std::vector<frequent_pathlet> freq_pathlets;
+        
 };
 
 
