@@ -2,7 +2,7 @@
 #include <CGAL/Simple_cartesian.h>
 
 #include <omp.h>
-
+#include <chrono>
 #include "CLI11.hpp"
 
 #include "free_space_graph.h"
@@ -19,7 +19,7 @@ using namespace frechet;
 
 using space = CGAL_metric_space<CGAL::Simple_cartesian<double>, CGAL::Dimension_tag<2>>;
 
-using bbgll_algo = subtrajectory_clustering_bbgll<space>;
+
 using free_space_graph_t =  free_space_graph_free_axis<space>;
 using frequent_subtrajectory_algo_t = frequent_subtrajectory_algo<space>;
 using trajectory_t = trajectory_collection<space>;
@@ -28,7 +28,7 @@ using index_t = trajectory_t::index_t;
 using distance_function_t = space::distance_function_t;
 using distance_t = distance_function_t::distance_t;
 using range_search_t = kd_tree_range_search<space>;
-
+namespace chrono = std::chrono;
 enum class sampling_mode {
     chernoff = 0,
     vc_dim = 1
@@ -81,7 +81,12 @@ int main(int argc, char** argv){
     freq_subtrajectory_sampler<space> sampler(dataset, epsilon, delta, radius, minimum_length, seed );
     sampler.generate_chernoff_sample();
     sampler.dump_sample_to_file(std::format("{}/chernoff_{}_{}_{}.txt", outfiledir, epsilon, delta, seed)); 
-    sampler.generate_vc_sample();
+    auto start = chrono::high_resolution_clock::now();
+    //sampler.generate_vc_sample();
+    sampler.generate_rough_vc_sample();
+    auto end = chrono::high_resolution_clock::now();
+    auto duration = duration_cast<chrono::seconds>(end - start);
+    std::cout << "TIME: "<<duration.count() << std::endl;
     sampler.dump_sample_to_file(std::format("{}/vc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
     //frequent_subtrajectory_algo_t algo(dataset, infilename, 0.4, 50); 
     //algo.populate_range_search_tree_with_sample_points();
