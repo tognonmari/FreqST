@@ -27,7 +27,9 @@ using distance_t = subtrajectory_cluster_algo::distance_t;
 
 enum class cluster_mode {
     means = 0,
-    center = 1
+    center = 1,
+    aided_means = 2,
+    aided_centers = 3,
 };
 
 
@@ -66,7 +68,7 @@ int main(int argc, char** argv) {
         ->expected(0.0, 1.0);
     app.add_option("-m,--mode",
                    mode,
-                   "Which clustering to use (0 = means, 1 = center)")
+                   "Which clustering to use (0 = means, 1 = center, 2 = aided_means, 3 = aided_centers)")
         ->default_val(1);
     app.add_option("input",
                    infilename,
@@ -111,15 +113,27 @@ int main(int argc, char** argv) {
     std::cout << "Initialized the k-cluster algorithm\n";
 
     if (mode == cluster_mode::means) { 
-        //clustering_algo.perform_means_clustering();
-        clustering_algo.perform_aided_means_clustering(infilename, samplefilename);
+        clustering_algo.perform_means_clustering();
+        
         auto eff = clustering_algo.compute_means_efficacy();
         std::cout << " Efficacy: " << eff << "\n";
     } else if (mode == cluster_mode::center) {
-        //clustering_algo.perform_center_clustering();
-        clustering_algo.perform_aided_centers_clustering(infilename, samplefilename);
+        clustering_algo.perform_center_clustering();
+        
         auto eff = clustering_algo.compute_center_efficacy();
         std::cout << " Efficacy: " << eff << "\n";
+    }
+    else if (mode == cluster_mode::aided_means){
+        clustering_algo.perform_aided_means_clustering(infilename, samplefilename);
+        auto eff = clustering_algo.compute_means_efficacy();
+        std::cout << " Efficacy: " << eff << "\n";
+    }
+    else if(mode== cluster_mode::aided_centers){
+
+        clustering_algo.perform_aided_centers_clustering(infilename, samplefilename);
+        auto eff = clustering_algo.compute_means_efficacy();
+        std::cout << " Efficacy: " << eff << "\n";
+
     }
 
     std::ofstream outfile;
