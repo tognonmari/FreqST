@@ -353,8 +353,8 @@ class frequent_subtrajectory_algo{
             float frequency;
 
         };
-
-    public:
+        
+        public:
         std::vector<frequent_pathlet> freq_pathlets;
 
         

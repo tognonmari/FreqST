@@ -288,7 +288,7 @@ public:
             // Compute the frequent pathlets, then swap the values of the freq pathlets vector into the new one before deletion
             float radius = std::sqrt(dist);
             range_search_t rs(sample);
-            float frequency_threshold = 0.1;
+            float frequency_threshold = 0.05;
             frequent_subtrajectory_algo_t algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
             algo.compute_maximal_frequent_pathlets();
             std::swap(algo.freq_pathlets, max_freq_pathlets_by_distance.at(i));
