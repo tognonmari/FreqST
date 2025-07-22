@@ -19,7 +19,7 @@
 #include "trajectory.h"
 #include "freq_st_algo.h"
 namespace frechet {
-
+    
 template<metric_space m_space>
 class subtrajectory_clustering_algo {
 
@@ -256,7 +256,187 @@ public:
         clustering_algos.front()->drop_inefficient_clusters_means(efficacy_factors);
         pathlets = clustering_algos.front()->get_clusters();
     }
+    void perform_aided_means_clustering_trying_all_pathlets(std::string infilename, std::string samplefilename){
+        std::cout<< "Performing sample aided clustering..." << std::endl;
+        // The distance isn't fixed yet, so we will multiply with it later.
+        config.cost_per_pathlet = efficacy_factors.c_2 / efficacy_factors.c_1; 
+        std::vector<std::unique_ptr<fixed_d_cluster>> clustering_algos;
+        std::vector<std::pair<bool, subtrajectory_cluster_t> > candidate_clusters;
+        std::vector<distance_t> gamma;
+        
+        std::vector<std::set<frequent_pathlet>> max_freq_pathlets_by_distance;
+        std::vector<int> num_uncovered_pathlets;
+        for (const auto &dist: sq_distances) {
+            std::cout<< "Initializing for distance "<<dist << std::endl;
+            clustering_algos.emplace_back(std::make_unique<fixed_d_cluster>(trajectory, dist));
+            std::cout<< "Finished Initializing cl algos for distance "<<dist << std::endl;
+            candidate_clusters.emplace_back();
+            std::cout<< "Finished Initializing candidate clusters for distance "<<dist << std::endl;
+            gamma.emplace_back();
+            std::cout<< "Finished Initializing their ds for distance "<<dist << std::endl;
+            max_freq_pathlets_by_distance.emplace_back();
+            std::cout<< "Finished Initializing for distance "<<dist << std::endl;
+        }
+        std::cout<< "Initialized data structures for aided means clustering." << std::endl;
+        //Do the sampling and initialization of the vector of frequent sts: we use the same chenoff sample?? For now, yes
+        //Generate the sample
+        trajectory_t sample = read_trajectory_from_file<space>(samplefilename); //samplefile needs to be passed as input
+        std::cout << "Read the sample, now mining frequent pathlets"<< std::endl;
+        float frequency_threshold = 0.1;
+        for(int i = 0; i<sq_distances.size(); i++){
+            const auto &dist = sq_distances.at(i);
+            // Compute the frequent pathlets, then swap the values of the freq pathlets vector into the new one before deletion
+            float radius = std::sqrt(dist);
+            range_search_t rs(sample);
+            
+            frequent_subtrajectory_algo_t algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
+            algo.compute_maximal_frequent_pathlets();
+            //std::swap(algo.freq_pathlets, max_freq_pathlets_by_distance.at(i));
+            //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
+            std::set<frequent_pathlet> temp(algo.freq_pathlets.begin(), algo.freq_pathlets.end());
 
+            std::swap(temp, max_freq_pathlets_by_distance.at(i));
+            std::cout <<(max_freq_pathlets_by_distance[i].size())<< ","<< algo.freq_pathlets.size()<<std::endl;
+            
+        }
+        std::cout << "Frequent pathlets computed for all distances.\n";
+        //TODO: rewrite this because this is horrible
+        while (clustering_algos.front()->count_remaining_points() > 0) {
+            
+            #pragma omp parallel for
+            for (size_t i = 0; i < clustering_algos.size(); ++i) {
+                
+                auto &[success, output_cluster] = candidate_clusters[i];
+                
+                if(!max_freq_pathlets_by_distance[i].empty()){
+                    //extract the frequent pathlet as center
+                    success = true;
+                    distance_t temp_gamma = std::numeric_limits<float>::max();
+                    subtrajectory_cluster_t candidate_cluster;
+                    for(auto& cluster_center : max_freq_pathlets_by_distance[i]){
+                        
+                        std::pair<index_t, index_t> offsets = cluster_center.extremes;
+                        id_t pathlet_mother = cluster_center.pathlet_mother;
+                        
+                        
+                        subtrajectory_t indexes_in_trajectory = from_freq_pathlet_to_subtrajectory(offsets, pathlet_mother);
+                        //Now build a free_space_graph_free_axis, and extract the cluster as they do.
+                        cluster_quality_t cl_qual(0,0,sq_distances[i], indexes_in_trajectory.first, indexes_in_trajectory.second);
+                        trajectory_t temp = clustering_algos[i]->get_trajectory();
+                        assert(!temp.is_point_deleted(indexes_in_trajectory.first));
+                        subtrajectory_clustering_rightstep<space> clustering_algos_rightstep(temp, std::vector<index_t>(temp.total_size(), index_t{1}), range_search, config);
+                        candidate_cluster = clustering_algos_rightstep.cluster_from_candidate(sq_distances[i], cl_qual);
+                        distance_t cluster_gamma = clustering_algos[i]->compute_gamma(output_cluster, efficacy_factors);
+                        if (cluster_gamma < temp_gamma){
+
+                            temp_gamma = cluster_gamma;
+                            std::swap(candidate_cluster, output_cluster);
+
+                        }
+                        
+                    }
+                }
+                else{
+                    
+                // If no uncovered pathlet is available, we can use the clustering algorithm to find a cluster.
+                
+                success = clustering_algos[i]->find_best_cluster_rightstep(output_cluster, config);
+                assert(success);
+
+                }
+                gamma[i] = clustering_algos[i]->compute_gamma(output_cluster, efficacy_factors);
+            }
+            // Pick best cluster as in Section 4.3 of Agarwal et. al, 2018.
+            size_t best_i = std::max_element(gamma.begin(), gamma.end()) - gamma.begin();
+            auto &best_cluster = candidate_clusters[best_i].second;
+            k_cluster_detail::prune_inefficient_subtrajectories(trajectory, best_cluster, gamma[best_i], efficacy_factors);
+            //TODO: Once the best cluster is selected, delete the unwanted pathlets from the frequent files. I should have a nice way of compputing these
+            // On very dense data sets, this can happen when very few points remain, due to floating point inaccuracies.
+            // The remaining points are better left unclustered, assuming c1 > 0.
+            if (best_cluster.get_subtrajectories().empty()) {
+                break;
+            }
+            std::cout << "Best cluster has "
+                << "distance: " << std::sqrt(sq_distances[best_i])
+                << ", gamma: " << gamma[best_i]
+                << ", vertices: " << best_cluster.number_of_vertices() << "\n";
+            
+            // Each algo has it's own trajectory and range search object.
+            // I think this is required for the parallel for loop.
+            for (auto &algo : clustering_algos) {
+                best_cluster = best_cluster;
+                //std::cout << "Deleting from algo"<< std::endl;
+                algo->establish_cluster(best_cluster);
+            }
+            std::cout << "UNCOVERED POINTS : "<< clustering_algos.front()->count_remaining_points() << std::endl;
+            //Find first uncovered frequent pathlet for each distance
+            for (size_t i = 0; i < max_freq_pathlets_by_distance.size(); i++){
+
+                if(!max_freq_pathlets_by_distance[i].empty()){
+                    bool found = false;
+                    for(auto iter = max_freq_pathlets_by_distance[i].begin(); iter != max_freq_pathlets_by_distance[i].end();){
+                        bool covered = false;
+                        frequent_pathlet p= *(iter);
+                        trajectory_t traj = clustering_algos[i]->get_trajectory();
+                        std::pair<index_t, index_t> offsets = p.extremes;
+                        id_t pathlet_mother = p.pathlet_mother;
+                        subtrajectory_t indexes_in_trajectory = from_freq_pathlet_to_subtrajectory(offsets, pathlet_mother);
+                        for(index_t h = indexes_in_trajectory.first; h <= indexes_in_trajectory.second; h++){
+                            if(traj.is_point_deleted(h)){
+                                covered = true;
+                                break;
+                            }
+                        }
+                        if(covered){
+                            iter = max_freq_pathlets_by_distance[i].erase(iter);
+                        }
+                        else{
+                            ++iter;
+                        }
+                    }
+
+                    /*
+                    for  (auto& p:max_freq_pathlets_by_distance[i]){
+                        std::cout << "Iterating over the distance "<< i <<std::endl;
+                        bool covered = false;
+                        
+                        trajectory_t traj = clustering_algos[i]->get_trajectory();
+                        std::pair<index_t, index_t> offsets = p.extremes;
+                        id_t pathlet_mother = p.pathlet_mother;
+                        subtrajectory_t indexes_in_trajectory = from_freq_pathlet_to_subtrajectory(offsets, pathlet_mother);
+
+                        for(index_t h = indexes_in_trajectory.first; h <= indexes_in_trajectory.second; h++){
+                            if(traj.is_point_deleted(h)){
+                                covered = true;
+                                break;
+                            }
+                        }
+                        if(covered){
+
+                            max_freq_pathlets_by_distance[i].erase((p));
+
+                        }
+                        if(max_freq_pathlets_by_distance[i].empty()){
+
+                            break;
+                        }
+                        
+                    }
+                    
+                    */
+                    
+                }
+            }            
+        
+        }
+        // all algorithms store the same clustering.
+        clustering_algos.front()->drop_inefficient_clusters_means(efficacy_factors);
+        pathlets = clustering_algos.front()->get_clusters();
+
+
+
+
+    }
     void perform_aided_means_clustering(std::string infilename, std::string samplefilename) {
         std::cout<< "Performing sample aided clustering..." << std::endl;
         // The distance isn't fixed yet, so we will multiply with it later.
@@ -294,6 +474,7 @@ public:
             std::swap(algo.freq_pathlets, max_freq_pathlets_by_distance.at(i));
             //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
             std::sort(max_freq_pathlets_by_distance[i].begin(), max_freq_pathlets_by_distance[i].end(), pathlet_sorter_by_length);
+            std::cout <<(max_freq_pathlets_by_distance[i].size())<<std::endl;
             //auto rng = std::default_random_engine {};
             //std::ranges::shuffle(max_freq_pathlets_by_distance.at(i), rng);
             first_uncovered_pathlet_by_distance.push_back(max_freq_pathlets_by_distance[i].size() - 1); //initialize with the last pathlet
@@ -350,7 +531,7 @@ public:
             // Each algo has it's own trajectory and range search object.
             // I think this is required for the parallel for loop.
             for (auto &algo : clustering_algos) {
-                best_cluster = best_cluster;
+                //best_cluster = best_cluster;
                 //std::cout << "Deleting from algo"<< std::endl;
                 algo->establish_cluster(best_cluster);
             }
@@ -401,7 +582,375 @@ public:
         pathlets = clustering_algos.front()->get_clusters();
 
     }
+    void perform_aided_means_clustering_top_k(std::string infilename, std::string samplefilename, int k){
 
+        std::cout<< "Performing sample aided clustering..." << std::endl;
+        // The distance isn't fixed yet, so we will multiply with it later.
+        config.cost_per_pathlet = efficacy_factors.c_2 / efficacy_factors.c_1; 
+        std::vector<std::unique_ptr<fixed_d_cluster>> clustering_algos;
+        std::vector<std::pair<bool, subtrajectory_cluster_t> > candidate_clusters;
+        std::vector<distance_t> gamma;
+        
+        std::vector<std::set<frequent_pathlet>> max_freq_pathlets_by_distance;
+        std::vector<int> num_uncovered_pathlets;
+        for (const auto &dist: sq_distances) {
+            std::cout<< "Initializing for distance "<<dist << std::endl;
+            clustering_algos.emplace_back(std::make_unique<fixed_d_cluster>(trajectory, dist));
+            std::cout<< "Finished Initializing cl algos for distance "<<dist << std::endl;
+            candidate_clusters.emplace_back();
+            std::cout<< "Finished Initializing candidate clusters for distance "<<dist << std::endl;
+            gamma.emplace_back();
+            std::cout<< "Finished Initializing their ds for distance "<<dist << std::endl;
+            max_freq_pathlets_by_distance.emplace_back();
+            std::cout<< "Finished Initializing for distance "<<dist << std::endl;
+        }
+        std::cout<< "Initialized data structures for aided means clustering." << std::endl;
+        //Do the sampling and initialization of the vector of frequent sts: we use the same chenoff sample?? For now, yes
+        //Generate the sample
+        trajectory_t sample = read_trajectory_from_file<space>(samplefilename); //samplefile needs to be passed as input
+        std::cout << "Read the sample, now mining frequent pathlets"<< std::endl;
+        float frequency_threshold = 0.05;
+        for(int i = 0; i<sq_distances.size(); i++){
+            const auto &dist = sq_distances.at(i);
+            // Compute the frequent pathlets, then swap the values of the freq pathlets vector into the new one before deletion
+            float radius = std::sqrt(dist);
+            range_search_t rs(sample);
+            
+            frequent_subtrajectory_algo_t algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
+            algo.compute_maximal_frequent_pathlets();
+            //std::swap(algo.freq_pathlets, max_freq_pathlets_by_distance.at(i));
+            //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
+            std::set<frequent_pathlet> temp(algo.freq_pathlets.begin(), algo.freq_pathlets.end());
+
+            std::swap(temp, max_freq_pathlets_by_distance.at(i));
+            std::cout <<(max_freq_pathlets_by_distance[i].size())<< ","<< algo.freq_pathlets.size()<<std::endl;
+            
+        }
+        std::cout << "Frequent pathlets computed for all distances.\n";
+        //TODO: rewrite this because this is horrible
+        while (clustering_algos.front()->count_remaining_points() > 0) {
+            
+            #pragma omp parallel for
+            for (size_t i = 0; i < clustering_algos.size(); ++i) {
+                
+                auto &[success, output_cluster] = candidate_clusters[i];
+                
+                if(!max_freq_pathlets_by_distance[i].empty()){
+                    //extract the frequent pathlet as center
+                    success = true;
+                    distance_t temp_gamma = std::numeric_limits<float>::max();
+                    subtrajectory_cluster_t candidate_cluster;
+                    int counter = 0;
+                    for(auto& cluster_center : max_freq_pathlets_by_distance[i]){
+                        
+                        counter++;
+                        std::pair<index_t, index_t> offsets = cluster_center.extremes;
+                        id_t pathlet_mother = cluster_center.pathlet_mother;
+                        subtrajectory_t indexes_in_trajectory = from_freq_pathlet_to_subtrajectory(offsets, pathlet_mother);
+                        //Now build a free_space_graph_free_axis, and extract the cluster as they do.
+                        cluster_quality_t cl_qual(0,0,sq_distances[i], indexes_in_trajectory.first, indexes_in_trajectory.second);
+                        trajectory_t temp = clustering_algos[i]->get_trajectory();
+                        subtrajectory_clustering_rightstep<space> clustering_algos_rightstep(temp, std::vector<index_t>(temp.total_size(), index_t{1}), range_search, config);
+                        candidate_cluster = clustering_algos_rightstep.cluster_from_candidate(sq_distances[i], cl_qual);
+                        distance_t cluster_gamma = clustering_algos[i]->compute_gamma(output_cluster, efficacy_factors);
+                        if (cluster_gamma < temp_gamma){
+
+                            temp_gamma = cluster_gamma;
+                            std::swap(candidate_cluster, output_cluster);
+
+                        }
+                        if(counter >=k){
+
+                            break;
+                        }
+                    }
+                }
+                else{
+                    
+                // If no uncovered pathlet is available, we can use the clustering algorithm to find a cluster.
+                
+                success = clustering_algos[i]->find_best_cluster_rightstep(output_cluster, config);
+                assert(success);
+
+                }
+                gamma[i] = clustering_algos[i]->compute_gamma(output_cluster, efficacy_factors);
+            }
+            // Pick best cluster as in Section 4.3 of Agarwal et. al, 2018.
+            size_t best_i = std::max_element(gamma.begin(), gamma.end()) - gamma.begin();
+            auto &best_cluster = candidate_clusters[best_i].second;
+            k_cluster_detail::prune_inefficient_subtrajectories(trajectory, best_cluster, gamma[best_i], efficacy_factors);
+            //TODO: Once the best cluster is selected, delete the unwanted pathlets from the frequent files. I should have a nice way of compputing these
+            // On very dense data sets, this can happen when very few points remain, due to floating point inaccuracies.
+            // The remaining points are better left unclustered, assuming c1 > 0.
+            if (best_cluster.get_subtrajectories().empty()) {
+                break;
+            }
+            std::cout << "Best cluster has "
+                << "distance: " << std::sqrt(sq_distances[best_i])
+                << ", gamma: " << gamma[best_i]
+                << ", vertices: " << best_cluster.number_of_vertices() << "\n";
+            
+            // Each algo has it's own trajectory and range search object.
+            // I think this is required for the parallel for loop.
+            for (auto &algo : clustering_algos) {
+                best_cluster = best_cluster;
+                //std::cout << "Deleting from algo"<< std::endl;
+                algo->establish_cluster(best_cluster);
+            }
+            std::cout << "UNCOVERED POINTS : "<< clustering_algos.front()->count_remaining_points() << std::endl;
+            //Find first uncovered frequent pathlet for each distance
+            for (size_t i = 0; i < max_freq_pathlets_by_distance.size(); i++){
+
+                if(!max_freq_pathlets_by_distance[i].empty()){
+                    bool found = false;
+                    for(auto iter = max_freq_pathlets_by_distance[i].begin(); iter != max_freq_pathlets_by_distance[i].end();){
+                        bool covered = false;
+                        frequent_pathlet p= *(iter);
+                        trajectory_t traj = clustering_algos[i]->get_trajectory();
+                        std::pair<index_t, index_t> offsets = p.extremes;
+                        id_t pathlet_mother = p.pathlet_mother;
+                        subtrajectory_t indexes_in_trajectory = from_freq_pathlet_to_subtrajectory(offsets, pathlet_mother);
+                        for(index_t h = indexes_in_trajectory.first; h <= indexes_in_trajectory.second; h++){
+                            if(traj.is_point_deleted(h)){
+                                covered = true;
+                                break;
+                            }
+                        }
+                        if(covered){
+                            iter = max_freq_pathlets_by_distance[i].erase(iter);
+                        }
+                        else{
+                            ++iter;
+                        }
+                    }
+
+                    /*
+                    for  (auto& p:max_freq_pathlets_by_distance[i]){
+                        std::cout << "Iterating over the distance "<< i <<std::endl;
+                        bool covered = false;
+                        
+                        trajectory_t traj = clustering_algos[i]->get_trajectory();
+                        std::pair<index_t, index_t> offsets = p.extremes;
+                        id_t pathlet_mother = p.pathlet_mother;
+                        subtrajectory_t indexes_in_trajectory = from_freq_pathlet_to_subtrajectory(offsets, pathlet_mother);
+
+                        for(index_t h = indexes_in_trajectory.first; h <= indexes_in_trajectory.second; h++){
+                            if(traj.is_point_deleted(h)){
+                                covered = true;
+                                break;
+                            }
+                        }
+                        if(covered){
+
+                            max_freq_pathlets_by_distance[i].erase((p));
+
+                        }
+                        if(max_freq_pathlets_by_distance[i].empty()){
+
+                            break;
+                        }
+                        
+                    }
+                    
+                    */
+                    
+                }
+            }            
+        
+        }
+        // all algorithms store the same clustering.
+        clustering_algos.front()->drop_inefficient_clusters_means(efficacy_factors);
+        pathlets = clustering_algos.front()->get_clusters();
+
+
+
+
+
+    }
+    void perform_aided_means_clustering_multiple_tries_over_length(std::string infilename, std::string samplefilename) {
+        std::cout<< "Performing sample aided clustering..." << std::endl;
+        // The distance isn't fixed yet, so we will multiply with it later.
+        config.cost_per_pathlet = efficacy_factors.c_2 / efficacy_factors.c_1; 
+        std::vector<std::unique_ptr<fixed_d_cluster>> clustering_algos;
+        std::vector<std::pair<bool, subtrajectory_cluster_t> > candidate_clusters;
+        std::vector<distance_t> gamma;
+        
+        std::vector<std::set<frequent_pathlet>> max_freq_pathlets_by_distance;
+        std::vector<int> num_uncovered_pathlets;
+        for (const auto &dist: sq_distances) {
+            std::cout<< "Initializing for distance "<<dist << std::endl;
+            clustering_algos.emplace_back(std::make_unique<fixed_d_cluster>(trajectory, dist));
+            std::cout<< "Finished Initializing cl algos for distance "<<dist << std::endl;
+            candidate_clusters.emplace_back();
+            std::cout<< "Finished Initializing candidate clusters for distance "<<dist << std::endl;
+            gamma.emplace_back();
+            std::cout<< "Finished Initializing their ds for distance "<<dist << std::endl;
+            max_freq_pathlets_by_distance.emplace_back();
+            std::cout<< "Finished Initializing for distance "<<dist << std::endl;
+        }
+        std::cout<< "Initialized data structures for aided means clustering." << std::endl;
+        //Do the sampling and initialization of the vector of frequent sts: we use the same chenoff sample?? For now, yes
+        //Generate the sample
+        trajectory_t sample = read_trajectory_from_file<space>(samplefilename); //samplefile needs to be passed as input
+        std::cout << "Read the sample, now mining frequent pathlets"<< std::endl;
+        float frequency_threshold = 0.1;
+        for(int i = 0; i<sq_distances.size(); i++){
+            const auto &dist = sq_distances.at(i);
+            // Compute the frequent pathlets, then swap the values of the freq pathlets vector into the new one before deletion
+            float radius = std::sqrt(dist);
+            range_search_t rs(sample);
+            
+            frequent_subtrajectory_algo_t algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
+            algo.compute_maximal_frequent_pathlets();
+            //std::swap(algo.freq_pathlets, max_freq_pathlets_by_distance.at(i));
+            //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
+            std::set<frequent_pathlet> temp(algo.freq_pathlets.begin(), algo.freq_pathlets.end());
+
+            std::swap(temp, max_freq_pathlets_by_distance.at(i));
+            std::cout <<(max_freq_pathlets_by_distance[i].size())<< ","<< algo.freq_pathlets.size()<<std::endl;
+            
+        }
+        std::cout << "Frequent pathlets computed for all distances.\n";
+        //TODO: rewrite this because this is horrible
+        while (clustering_algos.front()->count_remaining_points() > 0) {
+            
+            #pragma omp parallel for
+            for (size_t i = 0; i < clustering_algos.size(); ++i) {
+                
+                auto &[success, output_cluster] = candidate_clusters[i];
+                
+                if(!max_freq_pathlets_by_distance[i].empty()){
+                    //extract the frequent pathlet as center
+                    success = true;
+                    distance_t temp_gamma = std::numeric_limits<float>::max();
+                    subtrajectory_cluster_t candidate_cluster;
+                    frequent_pathlet max_p = *(max_freq_pathlets_by_distance[i].begin());
+                    int max_length = 1 + max_p.extremes.second - max_p.extremes.first;
+                    for(auto& cluster_center : max_freq_pathlets_by_distance[i]){
+                        
+                        std::pair<index_t, index_t> offsets = cluster_center.extremes;
+                        id_t pathlet_mother = cluster_center.pathlet_mother;
+                        if( offsets.second - offsets.first +1 < max_length){
+                            break;
+                        }
+                        
+                        subtrajectory_t indexes_in_trajectory = from_freq_pathlet_to_subtrajectory(offsets, pathlet_mother);
+                        //Now build a free_space_graph_free_axis, and extract the cluster as they do.
+                        cluster_quality_t cl_qual(0,0,sq_distances[i], indexes_in_trajectory.first, indexes_in_trajectory.second);
+                        trajectory_t temp = clustering_algos[i]->get_trajectory();
+                        
+                        subtrajectory_clustering_rightstep<space> clustering_algos_rightstep(temp, std::vector<index_t>(temp.total_size(), index_t{1}), range_search, config);
+                        candidate_cluster = clustering_algos_rightstep.cluster_from_candidate(sq_distances[i], cl_qual);
+                        distance_t cluster_gamma = clustering_algos[i]->compute_gamma(output_cluster, efficacy_factors);
+                        if (cluster_gamma < temp_gamma){
+
+                            temp_gamma = cluster_gamma;
+                            std::swap(candidate_cluster, output_cluster);
+
+                        }
+                        
+                    }
+                }
+                else{
+                    
+                // If no uncovered pathlet is available, we can use the clustering algorithm to find a cluster.
+                
+                success = clustering_algos[i]->find_best_cluster_rightstep(output_cluster, config);
+                assert(success);
+
+                }
+                gamma[i] = clustering_algos[i]->compute_gamma(output_cluster, efficacy_factors);
+            }
+            // Pick best cluster as in Section 4.3 of Agarwal et. al, 2018.
+            size_t best_i = std::max_element(gamma.begin(), gamma.end()) - gamma.begin();
+            auto &best_cluster = candidate_clusters[best_i].second;
+            k_cluster_detail::prune_inefficient_subtrajectories(trajectory, best_cluster, gamma[best_i], efficacy_factors);
+            //TODO: Once the best cluster is selected, delete the unwanted pathlets from the frequent files. I should have a nice way of compputing these
+            // On very dense data sets, this can happen when very few points remain, due to floating point inaccuracies.
+            // The remaining points are better left unclustered, assuming c1 > 0.
+            if (best_cluster.get_subtrajectories().empty()) {
+                break;
+            }
+            std::cout << "Best cluster has "
+                << "distance: " << std::sqrt(sq_distances[best_i])
+                << ", gamma: " << gamma[best_i]
+                << ", vertices: " << best_cluster.number_of_vertices() << "\n";
+            
+            // Each algo has it's own trajectory and range search object.
+            // I think this is required for the parallel for loop.
+            for (auto &algo : clustering_algos) {
+                best_cluster = best_cluster;
+                //std::cout << "Deleting from algo"<< std::endl;
+                algo->establish_cluster(best_cluster);
+            }
+            std::cout << "UNCOVERED POINTS : "<< clustering_algos.front()->count_remaining_points() << std::endl;
+            //Find first uncovered frequent pathlet for each distance
+            for (size_t i = 0; i < max_freq_pathlets_by_distance.size(); i++){
+
+                if(!max_freq_pathlets_by_distance[i].empty()){
+                    bool found = false;
+                    for(auto iter = max_freq_pathlets_by_distance[i].begin(); iter != max_freq_pathlets_by_distance[i].end();){
+                        bool covered = false;
+                        frequent_pathlet p= *(iter);
+                        trajectory_t traj = clustering_algos[i]->get_trajectory();
+                        std::pair<index_t, index_t> offsets = p.extremes;
+                        id_t pathlet_mother = p.pathlet_mother;
+                        subtrajectory_t indexes_in_trajectory = from_freq_pathlet_to_subtrajectory(offsets, pathlet_mother);
+                        for(index_t h = indexes_in_trajectory.first; h <= indexes_in_trajectory.second; h++){
+                            if(traj.is_point_deleted(h)){
+                                covered = true;
+                                break;
+                            }
+                        }
+                        if(covered){
+                            iter = max_freq_pathlets_by_distance[i].erase(iter);
+                        }
+                        else{
+                            ++iter;
+                        }
+                    }
+
+                    /*
+                    for  (auto& p:max_freq_pathlets_by_distance[i]){
+                        std::cout << "Iterating over the distance "<< i <<std::endl;
+                        bool covered = false;
+                        
+                        trajectory_t traj = clustering_algos[i]->get_trajectory();
+                        std::pair<index_t, index_t> offsets = p.extremes;
+                        id_t pathlet_mother = p.pathlet_mother;
+                        subtrajectory_t indexes_in_trajectory = from_freq_pathlet_to_subtrajectory(offsets, pathlet_mother);
+
+                        for(index_t h = indexes_in_trajectory.first; h <= indexes_in_trajectory.second; h++){
+                            if(traj.is_point_deleted(h)){
+                                covered = true;
+                                break;
+                            }
+                        }
+                        if(covered){
+
+                            max_freq_pathlets_by_distance[i].erase((p));
+
+                        }
+                        if(max_freq_pathlets_by_distance[i].empty()){
+
+                            break;
+                        }
+                        
+                    }
+                    
+                    */
+                    
+                }
+            }            
+        
+        }
+        // all algorithms store the same clustering.
+        clustering_algos.front()->drop_inefficient_clusters_means(efficacy_factors);
+        pathlets = clustering_algos.front()->get_clusters();
+
+
+
+    }
     distance_t compute_means_efficacy() {
         return k_cluster_detail::compute_efficacy_means(trajectory, pathlets, efficacy_factors);
     }
@@ -437,7 +986,7 @@ private:
     // Weights for computing the efficacy
     const efficacy_factor_t efficacy_factors;
     rightstep_config config;
-
+    
     void initialize_distance_limits(distance_t min_distance, distance_t max_distance){
         if(min_distance < 0 || max_distance < 0){
             const auto [trajectory_min_sq, trajectory_max_sq] = k_cluster_detail::compute_min_max_sq_distance(trajectory, range_search);

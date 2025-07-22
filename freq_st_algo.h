@@ -351,10 +351,36 @@ class frequent_subtrajectory_algo{
             std::pair<index_t,index_t> extremes;
             id_t pathlet_mother;
             float frequency;
+            
+            friend inline bool operator<(const frequent_pathlet& lhs, const frequent_pathlet& rhs){
+                
+                int lhs_length = lhs.extremes.second -lhs.extremes.first +1;
+                int rhs_length = rhs.extremes.second -rhs.extremes.first +1;
 
+                if(lhs_length > rhs_length){
+
+                    return true;
+
+                }
+                if (lhs_length < rhs_length){
+
+                    return false;
+
+                }
+                if (lhs.pathlet_mother < rhs.pathlet_mother){
+                    return true;
+                }
+                if (lhs.pathlet_mother> rhs.pathlet_mother){
+
+                    return false;
+                }
+                return lhs.extremes.first < rhs.extremes.first;
+
+
+            }
         };
         
-        public:
+    public:
         std::vector<frequent_pathlet> freq_pathlets;
 
         
