@@ -35,7 +35,7 @@ enum class cluster_mode {
 
 int main(int argc, char** argv) {
     std::array<distance_t, 2> distance_limits{-1, -1}; // negative number -> compute the global minimum / maximum distance and use that.
-    std::array<distance_t, 3> efficacy_factors{1, 0.003, 222};     // These default weights correspond to values used by Agarwal et al. (PODS'18)
+    std::array<distance_t, 3> efficacy_factors{1, 0.0003,2717};     // These default weights correspond to values used by Agarwal et al. (PODS'18)
     bool ignore_point_clusters_in_efficacy = false;
     rightstep_config config;
     int max_threads = 1;
@@ -64,7 +64,7 @@ int main(int argc, char** argv) {
     app.add_option<double>("-s,--simplify",
                    config.curve_simplification_factor,
                    "Relative threshold to use curve simplification (0 = never). Has to be < 1. Default value is 0.2 .")
-        ->default_val(0.2)
+        ->default_val(0.0)
         ->expected(0.0, 1.0);
     app.add_option("-m,--mode",
                    mode,
@@ -124,9 +124,9 @@ int main(int argc, char** argv) {
         std::cout << " Efficacy: " << eff << "\n";
     }
     else if (mode == cluster_mode::aided_means){
-        clustering_algo.perform_aided_means_clustering(infilename, samplefilename);
+        clustering_algo.perform_aided_means_clustering_k_random(infilename, samplefilename, 30);
         auto eff = clustering_algo.compute_means_efficacy();
-        std::cout << " Efficacy: " << eff << "\n";
+        std::cout << " Efficacy: " << eff << "\n"; 
     }
     else if(mode== cluster_mode::aided_centers){
 
