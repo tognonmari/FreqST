@@ -395,35 +395,6 @@ public:
                         }
                     }
 
-                    /*
-                    for  (auto& p:max_freq_pathlets_by_distance[i]){
-                        std::cout << "Iterating over the distance "<< i <<std::endl;
-                        bool covered = false;
-                        
-                        trajectory_t traj = clustering_algos[i]->get_trajectory();
-                        std::pair<index_t, index_t> offsets = p.extremes;
-                        id_t pathlet_mother = p.pathlet_mother;
-                        subtrajectory_t indexes_in_trajectory = from_freq_pathlet_to_subtrajectory(offsets, pathlet_mother);
-
-                        for(index_t h = indexes_in_trajectory.first; h <= indexes_in_trajectory.second; h++){
-                            if(traj.is_point_deleted(h)){
-                                covered = true;
-                                break;
-                            }
-                        }
-                        if(covered){
-
-                            max_freq_pathlets_by_distance[i].erase((p));
-
-                        }
-                        if(max_freq_pathlets_by_distance[i].empty()){
-
-                            break;
-                        }
-                        
-                    }
-                    
-                    */
                     
                 }
             }            
@@ -438,7 +409,7 @@ public:
 
     }
 
-    void perform_aided_means_clustering_k_random(std::string infilename, std::string samplefilename, int k){
+    void perform_aided_means_clustering_k_random(std::string infilename, std::string samplefilename,float frequency_threshold, int k, int seed){
 
         std::cout<< "Performing sample aided clustering..." << std::endl;
         // The distance isn't fixed yet, so we will multiply with it later.
@@ -465,7 +436,8 @@ public:
         //Generate the sample
         trajectory_t sample = read_trajectory_from_file<space>(samplefilename); //samplefile needs to be passed as input
         std::cout << "Read the sample, now mining frequent pathlets"<< std::endl;
-        float frequency_threshold = 0.05;
+        
+        //float frequency_threshold = 0.05;
         for(int i = 0; i<sq_distances.size(); i++){
             const auto &dist = sq_distances.at(i);
             // Compute the frequent pathlets, then swap the values of the freq pathlets vector into the new one before deletion
@@ -499,7 +471,7 @@ public:
                     int counter = 0;
 
                     int size = max_freq_pathlets_by_distance[i].size();
-                    srand((500));
+                    srand((seed));
 
                     // Generate a random number between 0 and 100
                     
@@ -625,7 +597,7 @@ public:
 
     }
 
-    void perform_aided_means_clustering(std::string infilename, std::string samplefilename) {
+    void perform_aided_means_clustering(std::string infilename, std::string samplefilename, float frequency_threshold) {
         std::cout<< "Performing sample aided clustering..." << std::endl;
         // The distance isn't fixed yet, so we will multiply with it later.
         config.cost_per_pathlet = efficacy_factors.c_2 / efficacy_factors.c_1; 
@@ -651,12 +623,13 @@ public:
         //Generate the sample
         trajectory_t sample = read_trajectory_from_file<space>(samplefilename); //samplefile needs to be passed as input
         std::cout << "Read the sample, now mining frequent pathlets"<< std::endl;
+        std::cout << "The sample has "<< sample.num_trajectories_not_consecutive() << " trajectories "<<std::endl;
         for(int i = 0; i<sq_distances.size(); i++){
             const auto &dist = sq_distances.at(i);
             // Compute the frequent pathlets, then swap the values of the freq pathlets vector into the new one before deletion
             float radius = std::sqrt(dist);
             range_search_t rs(sample);
-            float frequency_threshold = 0.05;
+            //float frequency_threshold = 0.05;
             frequent_subtrajectory_algo_t algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
             algo.compute_maximal_frequent_pathlets();
             std::swap(algo.freq_pathlets, max_freq_pathlets_by_distance.at(i));
