@@ -124,7 +124,7 @@ int main(int argc, char** argv) {
         std::cout << " Efficacy: " << eff << "\n";
     }
     else if (mode == cluster_mode::aided_means){
-        clustering_algo.perform_aided_means_clustering(infilename, samplefilename);
+        clustering_algo.perform_aided_means_clustering_top_k(infilename, samplefilename, 5);
         auto eff = clustering_algo.compute_means_efficacy();
         std::cout << " Efficacy: " << eff << "\n";
     }

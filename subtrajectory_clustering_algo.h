@@ -609,7 +609,7 @@ public:
         //Generate the sample
         trajectory_t sample = read_trajectory_from_file<space>(samplefilename); //samplefile needs to be passed as input
         std::cout << "Read the sample, now mining frequent pathlets"<< std::endl;
-        float frequency_threshold = 0.05;
+        float frequency_threshold = 0.1;
         for(int i = 0; i<sq_distances.size(); i++){
             const auto &dist = sq_distances.at(i);
             // Compute the frequent pathlets, then swap the values of the freq pathlets vector into the new one before deletion
