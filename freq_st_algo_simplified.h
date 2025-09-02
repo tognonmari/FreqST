@@ -189,8 +189,8 @@ class frequent_subtrajectory_algo_simplified{
                 subtrajectory_t st{initial_point+offsets.first, initial_point+ offsets.second};
                 //Now unsimplify st
                 std::optional<curve_simplification_cluster_summary_t> c = curve_simplification_cluster_summary_t{0,0,0.0,st.first,st.second};
-                std::cout <<"Unsimplifying Pathlet "<<p.extremes.first << " "<< p.extremes.second << " with mother "<< p.pathlet_mother<< std::endl;
-                std::cout << "This corresponds to subtrajectory "<< st.first << " "<< st.second << std::endl;
+                //std::cout <<"Unsimplifying Pathlet "<<p.extremes.first << " "<< p.extremes.second << " with mother "<< p.pathlet_mother<< std::endl;
+                //std::cout << "This corresponds to subtrajectory "<< st.first << " "<< st.second << std::endl;
                 std::optional<curve_simplification_cluster_summary_t> temp = cs.unsimplify(c);
                 p.extremes.first = temp.value().left_column - entire_dataset_for_query.get_first_point_in_trajectory(p.pathlet_mother);
                 p.extremes.second = temp.value().right_column - entire_dataset_for_query.get_first_point_in_trajectory(p.pathlet_mother);
