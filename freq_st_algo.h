@@ -288,6 +288,7 @@ class freq_subtrajectory_sampler{
 
         }
         auto rng = std::default_random_engine {};
+        rng.seed(this->seed);
         std::ranges::shuffle(indexes, rng);
         // Extract sampled ids
         for (int i = 0; i < sample_size; i++){
@@ -387,9 +388,8 @@ class frequent_subtrajectory_algo{
         frequent_subtrajectory_algo(trajectory_t& sampled_traj, range_search_t& search, std::string dataset_file, float frequency_threshold, distance_t distance_thresh) : search(search){
             this->sample = sampled_traj;
             this->dataset_location = dataset_file;
-            std::cout << sampled_traj.get_id_at(sampled_traj.total_size()-1)<< std::endl;
             std::cout<<"Frequency threshold is "<< frequency_threshold << std::endl;
-            this->integer_frequency_threshold = ceil(frequency_threshold *( (int)sampled_traj.get_id_at(sampled_traj.total_size()-1)));
+            this->integer_frequency_threshold = ceil(frequency_threshold *( (int)sampled_traj.num_trajectories_not_consecutive()));
             std::cout << "THE INTEGER FREQ THRESHOLD IS "<< this->integer_frequency_threshold<<std::endl;
             this-> last_parsed_trajectory = -1;
             this-> distance_threshold = distance_thresh;
@@ -489,7 +489,7 @@ class frequent_subtrajectory_algo{
 
             int d = pathlet_tree.getDepth(); //Last filled level
             //std::cout<< "tree has depth "<< d <<std::endl; // assertion for my toy dataset
-            int num_sampled_trajs = this->sample.num_trajectories();
+            int num_sampled_trajs = this->sample.num_trajectories_not_consecutive();
 
             //BOTTOM-UP VISIT OF THE TREE (starts from the deepest level with at least one valid pathlet, can access levels directly)
 
@@ -605,7 +605,7 @@ class frequent_subtrajectory_algo{
 
             int d = pathlet_tree.getDepth(); 
 
-            int num_sampled_trajs = this->sample.num_trajectories();
+            int num_sampled_trajs = this->sample.num_trajectories_not_consecutive();
 
             for (int level = d; d>=0; d--){
 

@@ -139,15 +139,8 @@ int main(int argc, char** argv) {
         std::cout << " Efficacy: " << eff << "\n";
     }
     else if (mode == cluster_mode::aided_means){
-<<<<<<< HEAD
-<<<<<<< HEAD
-        clustering_algo.perform_aided_means_clustering_top_k(infilename, samplefilename, 5);
-=======
-        clustering_algo.perform_aided_means_clustering_k_random(infilename, samplefilename, 30);
->>>>>>> 4c4a6ae1267738defa0f96bc4f1223cdf4f54545
-=======
+
         clustering_algo.perform_aided_means_clustering(infilename, samplefilename, frequency_threshold);
->>>>>>> 175a5e8f93f014fa49c102f17e79eda31d6469a3
         auto eff = clustering_algo.compute_means_efficacy();
         std::cout << " Efficacy: " << eff << "\n"; 
     }
