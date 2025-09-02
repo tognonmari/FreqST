@@ -35,7 +35,9 @@ public:
             this->num_trajs++;
 
         }
-        vertices.push_back(p);
+        
+                
+        vertices.push_back(p);       
         trajectory_id.push_back(id);
         original_trajectory_id.push_back(id);
         actual_size++;
@@ -149,7 +151,15 @@ public:
         }
         return result;
     }
+    index_t get_first_non_deleted_point_in_trajectory(id_t id) const {
+        assert(id < first_point_per_trajectory.size());
+        index_t result = first_point_per_trajectory[id];
+        while (result < trajectory_id.size() && trajectory_id[result] == deleted_id) {
+            ++result;
+        }
+        return result;
 
+    }
     void delete_point(index_t index) {
         assert(index < vertices.size());
         assert(trajectory_id[index] != deleted_id);
