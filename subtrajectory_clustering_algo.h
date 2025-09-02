@@ -277,23 +277,41 @@ public:
         //Generate the sample
         trajectory_t sample = read_trajectory_from_file<space>(samplefilename); //samplefile needs to be passed as input
         std::cout << "Read the sample, now mining frequent pathlets"<< std::endl;
-        float frequency_threshold = 0.1;
-        for(int i = 0; i<sq_distances.size(); i++){
+        
+        const auto &dist = sq_distances.back();
+        // Compute the frequent pathlets, then swap the values of the freq pathlets vector into the new one before deletion
+        double radius = std::sqrt(dist);
+        range_search_t rs(sample);
+        //float frequency_threshold = 0.05;
+        frequent_subtrajectory_algo<space> temp_algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
+        temp_algo.compute_maximal_frequent_pathlets();
+        std::set<frequent_pathlet> temp_set(temp_algo.freq_pathlets.begin(), temp_algo.freq_pathlets.end());
+        //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
+        std::swap(temp_set, max_freq_pathlets_by_distance.at(sq_distances.size()-1));
+
+        for(int i = sq_distances.size()-2; i>=0; i--){
+            if(max_freq_pathlets_by_distance.at(i+1).size()==0){
+
+                std::cout << "Could not find freq pathlets for the higher distance, so it is impossible to find ones for this as well"<< std::endl;
+                continue;
+
+            }
             const auto &dist = sq_distances.at(i);
             // Compute the frequent pathlets, then swap the values of the freq pathlets vector into the new one before deletion
-            float radius = std::sqrt(dist);
+            distance_t radius = std::sqrt(dist);
             range_search_t rs(sample);
-            
-            frequent_subtrajectory_algo_t algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
+            //float frequency_threshold = 0.05;
+            frequent_subtrajectory_algo<space> algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
             algo.compute_maximal_frequent_pathlets();
-            //std::swap(algo.freq_pathlets, max_freq_pathlets_by_distance.at(i));
-            //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
+            
             std::set<frequent_pathlet> temp(algo.freq_pathlets.begin(), algo.freq_pathlets.end());
 
             std::swap(temp, max_freq_pathlets_by_distance.at(i));
             std::cout <<(max_freq_pathlets_by_distance[i].size())<< ","<< algo.freq_pathlets.size()<<std::endl;
-            
+
+
         }
+
         std::cout << "Frequent pathlets computed for all distances.\n";
         //TODO: rewrite this because this is horrible
         while (clustering_algos.front()->count_remaining_points() > 0) {
@@ -432,23 +450,40 @@ public:
         trajectory_t sample = read_trajectory_from_file<space>(samplefilename); //samplefile needs to be passed as input
         std::cout << "Read the sample, now mining frequent pathlets"<< std::endl;
         
+        const auto &dist = sq_distances.back();
+        // Compute the frequent pathlets, then swap the values of the freq pathlets vector into the new one before deletion
+        double radius = std::sqrt(dist);
+        range_search_t rs(sample);
         //float frequency_threshold = 0.05;
-        for(int i = 0; i<sq_distances.size(); i++){
+        frequent_subtrajectory_algo<space> temp_algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
+        temp_algo.compute_maximal_frequent_pathlets();
+        std::set<frequent_pathlet> temp_set(temp_algo.freq_pathlets.begin(), temp_algo.freq_pathlets.end());
+        //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
+        std::swap(temp_set, max_freq_pathlets_by_distance.at(sq_distances.size()-1));
+
+        for(int i = sq_distances.size()-2; i>=0; i--){
+            if(max_freq_pathlets_by_distance.at(i+1).size()==0){
+
+                std::cout << "Could not find freq pathlets for the higher distance, so it is impossible to find ones for this as well"<< std::endl;
+                continue;
+
+            }
             const auto &dist = sq_distances.at(i);
             // Compute the frequent pathlets, then swap the values of the freq pathlets vector into the new one before deletion
-            float radius = std::sqrt(dist);
+            distance_t radius = std::sqrt(dist);
             range_search_t rs(sample);
-            
-            frequent_subtrajectory_algo_t algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
+            //float frequency_threshold = 0.05;
+            frequent_subtrajectory_algo<space> algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
             algo.compute_maximal_frequent_pathlets();
-            //std::swap(algo.freq_pathlets, max_freq_pathlets_by_distance.at(i));
-            //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
+            
             std::set<frequent_pathlet> temp(algo.freq_pathlets.begin(), algo.freq_pathlets.end());
 
             std::swap(temp, max_freq_pathlets_by_distance.at(i));
             std::cout <<(max_freq_pathlets_by_distance[i].size())<< ","<< algo.freq_pathlets.size()<<std::endl;
-            
+
+
         }
+
         std::cout << "Frequent pathlets computed for all distances.\n";
         //TODO: rewrite this because this is horrible
         while (clustering_algos.front()->count_remaining_points() > 0) {
@@ -590,25 +625,52 @@ public:
         trajectory_t sample = read_trajectory_from_file<space>(samplefilename); //samplefile needs to be passed as input
         std::cout << "Read the sample, now mining frequent pathlets"<< std::endl;
         std::cout << "The sample has "<< sample.num_trajectories_not_consecutive() << " trajectories "<<std::endl;
-        for(int i = 0; i<sq_distances.size(); i++){
+        const auto &dist = sq_distances.back();
+        // Compute the frequent pathlets, then swap the values of the freq pathlets vector into the new one before deletion
+        double radius = std::sqrt(dist);
+        range_search_t rs(sample);
+        //float frequency_threshold = 0.05;
+        frequent_subtrajectory_algo<space> temp_algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
+        temp_algo.compute_maximal_frequent_pathlets();
+        //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
+        std::swap(temp_algo.freq_pathlets, max_freq_pathlets_by_distance.at(sq_distances.size()-1));
+        //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
+        std::sort(max_freq_pathlets_by_distance[sq_distances.size()-1].begin(), max_freq_pathlets_by_distance[sq_distances.size()-1].end(), pathlet_sorter_by_frequency);
+        std::cout <<(max_freq_pathlets_by_distance[sq_distances.size()-1].size())<<std::endl;
+        //auto rng = std::default_random_engine {};
+        //std::ranges::shuffle(max_freq_pathlets_by_distance.at(i), rng);
+        first_uncovered_pathlet_by_distance[sq_distances.size()-1] = (max_freq_pathlets_by_distance[sq_distances.size()-1].size() - 1); //initialize with the last pathlet
+        
+        for(int i = sq_distances.size()-2; i>=0; i--){
+            if(max_freq_pathlets_by_distance.at(i+1).size()==0){
+
+                std::cout << "Could not find freq pathlets for the higher distance, so it is impossible to find ones for this as well"<< std::endl;
+                first_uncovered_pathlet_by_distance[i] = (- 1);
+                continue;
+
+            }
             const auto &dist = sq_distances.at(i);
             // Compute the frequent pathlets, then swap the values of the freq pathlets vector into the new one before deletion
-            float radius = std::sqrt(dist);
+            double radius = std::sqrt(dist);
             range_search_t rs(sample);
             //float frequency_threshold = 0.05;
-            frequent_subtrajectory_algo_t algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
+            frequent_subtrajectory_algo<space> algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
             algo.compute_maximal_frequent_pathlets();
+            
+            //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
             std::swap(algo.freq_pathlets, max_freq_pathlets_by_distance.at(i));
             //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
-            std::sort(max_freq_pathlets_by_distance[i].begin(), max_freq_pathlets_by_distance[i].end(), pathlet_sorter_by_length);
+            std::sort(max_freq_pathlets_by_distance[i].begin(), max_freq_pathlets_by_distance[i].end(), pathlet_sorter_by_frequency);
             std::cout <<(max_freq_pathlets_by_distance[i].size())<<std::endl;
             //auto rng = std::default_random_engine {};
             //std::ranges::shuffle(max_freq_pathlets_by_distance.at(i), rng);
-            first_uncovered_pathlet_by_distance.push_back(max_freq_pathlets_by_distance[i].size() - 1); //initialize with the last pathlet
+            first_uncovered_pathlet_by_distance[i] = (max_freq_pathlets_by_distance[i].size() - 1); //initialize with the last pathlet
             if(i==sq_distances.size() -1){
 
                 std::cout << "Found this longest frequent pathlet " << max_freq_pathlets_by_distance[i].back().extremes.first << " " << max_freq_pathlets_by_distance[i].back().extremes.second << " with mother " << max_freq_pathlets_by_distance[i].back().pathlet_mother <<  std::endl;
             }
+
+
         }
         std::cout << "Frequent pathlets computed for all distances.\n";
         //TODO: rewrite this because this is horrible
