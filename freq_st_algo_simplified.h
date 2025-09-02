@@ -9,8 +9,7 @@
 #include <algorithm>
 #include <random>
 
-
-
+#include "free_space_graph_incremental.h"
 #include "free_space_graph_free_axis.h"
 #include "kdtree_range_search.h"
 #include "metric_space.h"
@@ -18,323 +17,11 @@
 #include "trajectory.h"
 #include "canonical_pathlets.h"
 #include "curve_simplification.h"
+#include "freq_st_algo.h"
 namespace frechet{
 
 template<metric_space m_space>
-class freq_subtrajectory_sampler{
-
-    public:
-    using space = m_space;
-    using range_search_t = kd_tree_range_search<space>;
-    using point_t = space::point_t;
-    using distance_function_t = space::distance_function_t;
-    using distance_t = distance_function_t::distance_t;
-    using trajectory_t = trajectory_collection<space>;
-    using index_t = trajectory_t::index_t;
-    using subtrajectory_t = trajectory_t::subtrajectory_t;
-    using id_t = trajectory_t::id_t;
-
-    
-    public:
-        freq_subtrajectory_sampler(const trajectory_t& trajectory,
-            float eps, 
-            float del, 
-            distance_t radius, int minimum_length, int random_seed) : the_trajectory(trajectory), epsilon(eps), delta(del), distance_threshold(radius), min_length(minimum_length), seed(random_seed){
-
-                std::mt19937 seeded_generator(seed);
-                this->mt = seeded_generator;
-            }
-
-        void generate_chernoff_sample(){
-
-            //Step 1: compute sample size according to Chernoff rule. 
-
-            (this->sampled_trajs_ids).clear();
-
-            int sample_size = (int) (3 / (epsilon * epsilon)) * log(2 * this->total_pathlet_number_respecting_ids() / delta);
-            std::cout << "Chernoff sample size with espilon "<<epsilon << ",delta "<< delta <<" is: "<< sample_size <<std::endl;
-            //Step 2: assert sampling is worthwhile
-            if(sample_size > the_trajectory.num_trajectories()){
-
-                std::cerr << "Chernoff Bound was too loose for your dataset."<< std::endl;
-
-                std::exit(1);
-
-            }
-            
-            //Step 3: Sample indexes with replacement
-            
-            this->sample_trajectories(sample_size); 
-
-        }
-
-        void generate_vc_sample(){
-
-            //Step 1: compute sample size according to Chernoff rule. 
-
-            (this->sampled_trajs_ids).clear();
-
-            int sample_size = (int) (2 / (epsilon * epsilon)) * (this->vc_dim() + log(2 / delta));
-            std::cout << "VCdim sample size with espilon "<<epsilon << ",  delta "<< delta <<", radius "<< distance_threshold<< " is: "<< sample_size <<std::endl;
-            //Step 2: assert sampling is worthwhile
-            if(sample_size > the_trajectory.num_trajectories()){
-
-                std::cerr << "VC Bound was too loose for your dataset."<< std::endl;
-
-                std::exit(1);
-
-            }
-            //Step 3: Sample indexes with replacement
-            this->sample_trajectories(sample_size);
-
-        }
-
-        void generate_rough_vc_sample(){
-
-            //Step 1: compute sample size according to Chernoff rule. 
-            (this->sampled_trajs_ids).clear();
-
-            int sample_size = (int) (2 / (epsilon * epsilon)) * (this->rough_vc_dim() + log(2 / delta));
-            std::cout << " Rough VCdim sample size with espilon "<<epsilon << ",  delta "<< delta <<", radius "<< distance_threshold<< " is: "<< sample_size <<std::endl;
-            //Step 2: assert sampling is worthwhile
-            if(sample_size > the_trajectory.num_trajectories()){
-
-                std::cerr << "VC Bound was too loose for your dataset."<< std::endl;
-
-                std::exit(1);
-
-            }
-            //Step 3: Sample indexes with replacement
-            this->sample_trajectories(sample_size);
-
-        }
-
-        void dump_sample_to_file(std::string filename){
-
-            //std::cout << "Started dumping the sample to a file"<< std::endl;
-            assert(!sampled_trajs_ids.empty());
-            std::ofstream fout(filename);
-            for (int j = 0; j< sampled_trajs_ids.size(); j++){
-                //std::cout << "I am printing the sample "<< j <<std::endl;
-                this->print_subtrajectory_to_file(fout, sampled_trajs_ids.at(j));
-
-            }
-
-            return;
-        }
-
-        void generate_fixed_size_sample(int size){
-
-            (this->sampled_trajs_ids).clear();
-
-            if(size > the_trajectory.num_trajectories()){
-
-                std::cerr << "VC Bound was too loose for your dataset."<< std::endl;
-
-                std::exit(1);
-
-            }
-            this->sample_trajectories(size);
-        }
-
-    private:
-    int rough_vc_dim(){
-        range_search_t search{the_trajectory};
-        std::vector<int> c;
-        index_t last_seen_trajectory = the_trajectory.get_id_at(0);
-        int counter;
-        int total_distances = 0;
-        for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-            if(i%10000 == 0){
-                
-            std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
-
-            }
-            if(the_trajectory.get_id_at(i) == last_seen_trajectory){
-
-                int ss = search.search(i, this->distance_threshold).size();
-                counter += ss;
-                total_distances += ss;
-
-            }
-            else{
-
-                // Append the result up to now to c
-                c.push_back(floor(log2(counter) + 1));
-                //initialize the set again 
-                counter = 0;
-                last_seen_trajectory = the_trajectory.get_id_at(i);
-                int ss = search.search(i, this->distance_threshold).size();
-                counter += ss;
-                //add info for the current point
-
-
-            }
-
-        }  
-        std::cout<<total_distances << std::endl;
-        std::sort(c.begin(),c.end(), std::greater<>());
-
-        int vc_dim = 0;
-        
-        for(int i = 0 ; i < c.size(); i++){
-
-            if(vc_dim < c.at(i)){
-
-                vc_dim++;
-
-            }
-
-        }
-
-        return vc_dim;
-
-    }
-
-    int vc_dim(){
-
-        //Compute VC Dimension 
-        range_search_t search{the_trajectory};
-        std::vector<int> c;
-        index_t last_seen_trajectory = the_trajectory.get_id_at(0);
-        std::set<index_t> traj_set;
-        
-        for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-            if(i%10000 == 0){
-                
-            std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
-
-            }
-            if(the_trajectory.get_id_at(i) == last_seen_trajectory){
-
-                for (const auto idx: search.search(i, this->distance_threshold)) {
-
-                    traj_set.insert(idx);
-
-                }
-            }
-            else{
-
-                // Append the result up to now to c
-                c.push_back(floor(log2(traj_set.size()) + 1));
-                //initialize the set again 
-                traj_set.clear();
-                last_seen_trajectory = the_trajectory.get_id_at(i);
-                //add info for the current point
-                for (const auto idx: search.search(i, this->distance_threshold)) {
-
-                    traj_set.insert(idx);
-
-                }
-
-
-            }
-
-        }
-        std::sort(c.begin(),c.end(), std::greater<>());
-        int vc_dim = 0;
-        
-        for(int i = 0 ; i < c.size(); i++){
-
-            if(vc_dim < c.at(i)){
-
-                vc_dim++;
-
-            }
-
-        }
-
-        return vc_dim;
-    }
-
-    void print_subtrajectory_to_file(std::ofstream& fout, id_t& id){
-
-        size_t n = the_trajectory.num_trajectories();
-        index_t j = the_trajectory.get_first_point_in_trajectory(id%n);
-        
-        while( the_trajectory.get_id_at(j) == id%n){
-            j++;
-            fout << the_trajectory[j].x()<< " "<< the_trajectory[j].y()<<" "<< id<<std::endl;
-        }
-
-        return;
-    }
-
-    int total_pathlet_number_respecting_ids(){
-        int total = 0;
-
-        for (id_t i = 0; i < the_trajectory.num_trajectories(); i ++){
-
-            total += 2 * ceil(( the_trajectory.get_trajectory_size(i) / min_length));
-
-        }
-
-        return total;
-
-    }
-    //return type should be void-> TODO:correct this!!!
-    void sample_trajectories(int sample_size){
-
-        if(! sampled_trajs_ids.empty()){
-
-            sampled_trajs_ids.clear();
-
-        }
-        std::vector<id_t> indexes;
-        int n = the_trajectory.num_trajectories();
-        for (int i = 0; i< n; i++){
-
-            indexes.push_back(i);
-
-        }
-        auto rng = std::default_random_engine {};
-        std::ranges::shuffle(indexes, rng);
-        // Extract sampled ids
-        for (int i = 0; i < sample_size; i++){
-
-            sampled_trajs_ids.push_back(indexes.at(i));
-
-        }
-
-        std::sort(sampled_trajs_ids.begin(),sampled_trajs_ids.end());
-
-        id_t last_read_trajectory = sampled_trajs_ids.at(0);
-        int repetitions = 0;
-        for( int j = 1; j< sample_size; j++){
-            
-            if (sampled_trajs_ids.at(j) == last_read_trajectory){
-
-                repetitions++;
-                sampled_trajs_ids.at(j) += (id_t) (repetitions * n);
-
-            }
-            else{
-                last_read_trajectory = sampled_trajs_ids.at(j);
-                repetitions = 0;
-            }
-            if(repetitions > 0){
-
-                std::cout<< "I have repetitions despite the shuffle"<< std::endl;
-            }
-        }
-        //std::cout<< "I have finished the method to get the ids"<< std::endl;
-        return;
-    }
-
-    std::mt19937 mt;
-    std::vector<id_t> sampled_trajs_ids;
-    trajectory_t the_trajectory;
-    distance_t distance_threshold;
-    float epsilon;
-    float delta;
-    int min_length;
-    bool performed_sampling;
-    int seed;
-    
-};
-
-template<metric_space m_space>
-class frequent_subtrajectory_algo{
+class frequent_subtrajectory_algo_simplified{
     public:
         using space = m_space;
         using trajectory_t = trajectory_collection<space>;
@@ -345,7 +32,10 @@ class frequent_subtrajectory_algo{
         using distance_t = distance_function_t::distance_t;
         using binary_pathlet_tree_t = BinaryPathletTree<space>;
         using range_search_t = kd_tree_range_search<space>;
-    
+        using subtrajectory_t = trajectory_t::subtrajectory_t;
+        using curve_simplification_cluster_summary_t = frechet::internal::curve_simplification<space>::cluster_summary_t;
+        using frequent_pathlet = typename frequent_subtrajectory_algo<space>::frequent_pathlet;
+        /*
         struct frequent_pathlet{
 
             std::pair<index_t,index_t> extremes;
@@ -379,28 +69,24 @@ class frequent_subtrajectory_algo{
 
             }
         };
-        
+    */
     public:
         std::vector<frequent_pathlet> freq_pathlets;
 
         
-        frequent_subtrajectory_algo(trajectory_t& sampled_traj, range_search_t& search, std::string dataset_file, float frequency_threshold, distance_t distance_thresh) : search(search){
-            this->sample = sampled_traj; //I keep the original sample, I will build the simplification later in the constructor
+        frequent_subtrajectory_algo_simplified(trajectory_t& sampled_traj, range_search_t& search, std::string dataset_file, float frequency_threshold, distance_t& distance_thresh, distance_t& simplification_factor) : sample(sampled_traj), distance_threshold(distance_thresh),curve_simplification_factor(simplification_factor), simplification{sample, distance_threshold*distance_threshold,curve_simplification_factor}, search(search) {
+            this->sample = sampled_traj; 
             this->dataset_location = dataset_file;
-            std::cout << sampled_traj.num_trajectories_not_consecutive()<< std::endl;
+            std::cout << sample.num_trajectories_not_consecutive()<< std::endl;
             std::cout<<"Frequency threshold is "<< frequency_threshold << std::endl;
-            this->integer_frequency_threshold = ceil(frequency_threshold *((int)sampled_traj.num_trajectories_not_consecutive()));
+            this->integer_frequency_threshold = ceil(frequency_threshold *((int)sample.num_trajectories_not_consecutive()));
             std::cout << "THE INTEGER FREQ THRESHOLD IS "<< this->integer_frequency_threshold<<std::endl;
             this-> last_parsed_trajectory = -1;
             this-> distance_threshold = distance_thresh;
-            
-            //TODO: new param: simplified curve
-            /*
-            
             this->curve_simplification_factor = curve_simplification_factor;
-            frechet::internal::curve_simplification<space> temporary_simplification(sampled_traj, distance_threshold * distance_threshold, curve_simplification_factor);
-            std::swap(this->simplification, temporary_simplification);
-            */
+            //frechet::internal::curve_simplification<space> temporary_simplification(sampled_traj, distance_threshold * distance_threshold, curve_simplification_factor);
+            std::cout << "Simplified traj has size : "<< this->simplification.trajectory().total_size()<< std::endl;
+
         }
 
 
@@ -415,19 +101,19 @@ class frequent_subtrajectory_algo{
             while(!input_stream.eof()){
 
                 trajectory_t pathlet_mother = this->read_next_transaction_from_file(input_stream);
-
+                frechet::internal::curve_simplification<space> pathlet_mother_simplification(pathlet_mother, this->distance_threshold * this->distance_threshold, this->curve_simplification_factor);
                 //std::cout <<"Parsed a transaction."<<std::endl;
                 //std::cout<<" The transaction has ID "<<pathlet_mother.get_id_at(pathlet_mother.get_actual_size()-1)<<std::endl;
                 //std::cout <<" I have this many points : "<< pathlet_mother.get_actual_size()<<std::endl;
-
-                BinaryPathletTree pathlet_tree(pathlet_mother, pathlet_mother.get_id_at(0),floor(log2(pathlet_mother.total_size())) + 1,1);
+                trajectory_t simplified_mother_trajectory = pathlet_mother_simplification.trajectory();
+                BinaryPathletTree pathlet_tree(simplified_mother_trajectory, pathlet_mother.get_id_at(0),floor(log2(pathlet_mother_simplification.trajectory().total_size())) + 1,1);
                 
                 //INITIALIZE FREE SPACE DIAGRAM 
                 free_space_graph_t fsg(0);
                 
                 //POPULATE FREE SPACE DIAGRAM : THE SAMPLE IS ALONG THE Y-AXIS, THE TRANSACTION WHICH BAERS THE PATHLETS FOR THE CURRENT TREE IS ALONG THE X-AXIS
 
-                this->populate_all_columns_with_labels(fsg, pathlet_mother);
+                this->populate_all_columns_with_labels(fsg, pathlet_mother_simplification.trajectory());
 
                 //std::cout <<"Populated the columns."<<std::endl;
                 
@@ -450,24 +136,27 @@ class frequent_subtrajectory_algo{
             while(!input_stream.eof()){
 
                 trajectory_t pathlet_mother = this->read_next_transaction_from_file(input_stream);
-                //TODO: add simplification of the pathlets here
-
-                //frechet::internal::curve_simplification<space> pathlet_mother_simplification(pathlet_mother, distance_threshold * distance_threshold, curve_simplification_factor);
+                frechet::internal::curve_simplification<space> pathlet_mother_simplification(pathlet_mother, this->distance_threshold * this->distance_threshold, this->curve_simplification_factor);
                 //std::cout <<"Parsed a transaction."<<std::endl;
                 //std::cout<<" The transaction has ID "<<pathlet_mother.get_id_at(pathlet_mother.get_actual_size()-1)<<std::endl;
                 //std::cout <<" I have this many points : "<< pathlet_mother.get_actual_size()<<std::endl;
-                BinaryPathletTree pathlet_tree(pathlet_mother, pathlet_mother.get_id_at(0),floor(log2(pathlet_mother.total_size())) + 1,1);
+                trajectory_t simplified_mother_trajectory = pathlet_mother_simplification.trajectory();
+                BinaryPathletTree pathlet_tree(simplified_mother_trajectory, pathlet_mother.get_id_at(0),floor(log2(pathlet_mother_simplification.trajectory().total_size())) + 1,1);
                 
+                //INITIALIZE FREE SPACE DIAGRAM 
                 free_space_graph_t fsg(0);
                 
-                //for all the columns of the bst populate the column
-                this->populate_all_columns_with_labels(fsg, pathlet_mother);
+                //POPULATE FREE SPACE DIAGRAM : THE SAMPLE IS ALONG THE Y-AXIS, THE TRANSACTION WHICH BAERS THE PATHLETS FOR THE CURRENT TREE IS ALONG THE X-AXIS
+
+                this->populate_all_columns_with_labels(fsg, pathlet_mother_simplification.trajectory());
+
                 //std::cout <<"Populated the columns."<<std::endl;
-                //maybe i need to rewrite the kd tree to access with the coordinates directly
+                
+                //COLLECT THE FREQUENT PATHLETS GENERATED BY THE CURRENT PATHLET MOTHER
+
                 this->collect_maximal_frequent_pathlets(fsg, pathlet_tree);
 
             }
-
 
 
         }
@@ -475,7 +164,7 @@ class frequent_subtrajectory_algo{
         //FLUSH THE FREQUENT PATHLETS TO A FILE
 
         void dump_collected_pathlets_to_file(std::string outputfilename){
-
+            //TODO: capire se voglio dumparli simplified or unsimplified.
             std::ofstream outfile(outputfilename);
             // Dump all freq pathlets in the data structure to a file  
             for(frequent_pathlet& fp : this->freq_pathlets){
@@ -488,6 +177,28 @@ class frequent_subtrajectory_algo{
             outfile.close();
         }
         
+        void unsimplify_collected_pathlets(){
+
+            for (auto& p: this->freq_pathlets){
+                
+                //from frequent pathlets to indexes in trajectories 
+                subtrajectory_t offsets = p.extremes;
+                index_t initial_point = simplification.trajectory().get_first_point_in_trajectory(p.pathlet_mother);
+                
+                std::cout << "Initial point for trajectory "<< p.pathlet_mother << "is" << simplification.trajectory().get_first_point_in_trajectory(2)<< std::endl;
+                subtrajectory_t st{initial_point+offsets.first, initial_point+ offsets.second};
+                //Now unsimplify st
+                std::optional<curve_simplification_cluster_summary_t> c = curve_simplification_cluster_summary_t{0,0,0.0,st.first,st.second};
+                std::cout <<"Unsimplifying Pathlet "<<p.extremes.first << " "<< p.extremes.second << " with mother "<< p.pathlet_mother<< std::endl;
+                std::cout << "This corresponds to subtrajectory "<< st.first << " "<< st.second << std::endl;
+                std::optional<curve_simplification_cluster_summary_t> temp = simplification.unsimplify(c);
+                p.extremes.first = temp.value().left_column - sample.get_first_point_in_trajectory(p.pathlet_mother);
+                p.extremes.second = temp.value().right_column - sample.get_first_point_in_trajectory(p.pathlet_mother);
+
+            }
+
+
+        }
 
     private:
 
@@ -814,14 +525,14 @@ class frequent_subtrajectory_algo{
 
         }
 
-        trajectory_t sample;
+        trajectory_t& sample;
         range_search_t& search;
         std::string dataset_location;
         id_t last_parsed_trajectory;
-        distance_t distance_threshold;
+        distance_t& distance_threshold;
         int integer_frequency_threshold;
-        //distance_t curve_simplification_factor = 0;
-        //frechet::internal::curve_simplification<space>& simplification;
+        distance_t& curve_simplification_factor = 0;
+        const frechet::internal::curve_simplification<space> simplification;
 };
 
 

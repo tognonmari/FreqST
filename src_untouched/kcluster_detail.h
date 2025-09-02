@@ -311,13 +311,16 @@ public:
 
     static void erase_points_in_cluster(trajectory_t &trajectory, range_search_t &range_search, const subtrajectory_cluster_t &cluster) {
         for (const auto& subt: cluster.get_subtrajectories()) {
+            
             trajectory.delete_subtrajectory(subt);
             for (auto idx = subt.first; idx <= subt.second; ++idx) {
+                
                 range_search.delete_point(idx);
+
             }
         }
     }
-
+    
     static void print_pathlets(const std::vector<subtrajectory_cluster_t> &pathlets) {
         for (const auto & cluster: pathlets) {
             const auto& ref = cluster.get_reference_subtrajectory();

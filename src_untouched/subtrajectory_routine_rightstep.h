@@ -320,7 +320,7 @@ private:
     
     */
     subtrajectory_cluster_t to_subtrajectory_cluster(const cluster_summary_t &cluster_summary, const distance_t &distance_max){
-        free_space_graph_incremental_t free_space(cluster_summary.left_column, config.prefer_small_subtrajectories, config.cost_per_pathlet);
+        free_space_graph_incremental_t free_space(cluster_summary.left_column, config.prefer_small_subtrajectories, config.cost_per_pathlet);       
         for(index_t column = cluster_summary.left_column; column <= cluster_summary.right_column; ++column){
             if(column != cluster_summary.left_column) free_space.new_column();
             for(const auto idx : search.search(column, distance_max)){

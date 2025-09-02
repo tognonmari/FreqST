@@ -36,7 +36,7 @@ enum class cluster_mode {
 
 int main(int argc, char** argv) {
     std::array<distance_t, 2> distance_limits{-1, -1}; // negative number -> compute the global minimum / maximum distance and use that.
-    std::array<distance_t, 3> efficacy_factors{1, 0.00003,128};     // These default weights correspond to values used by Agarwal et al. (PODS'18)
+    std::array<distance_t, 3> efficacy_factors{1.0, 0.00003, 2717};     // These default weights correspond to values used by Agarwal et al. (PODS'18)
     bool ignore_point_clusters_in_efficacy = false;
     rightstep_config config;
     int max_threads = 1;
@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
     cluster_mode mode;
     int seed=0;
     int k=5;
-    float frequency_threshold = 0.1;
+    double frequency_threshold = 0.1;
     CLI::App app{"Subtrajectory clustering via rightstep only."};
     app.add_option("-d,--distance_limit",
                    distance_limits,
@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
                     k,
                     "Number of pathlets to examine (upper bound). Default is 5")
         ->default_val(5);
-    app.add_option<float>("-f, --frequency_threshold",
+    app.add_option<double>("-f, --frequency_threshold",
                         frequency_threshold,
                     "The frequenc y threshold for the frequent pathlets.")
         ->expected(0.0, 1.0);
@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
     std::cout << "Using up to " << max_threads << " threads.\n";
 
     config.prefer_small_subtrajectories = (mode == cluster_mode::center);
-
+    config.tree_intervals_only = 1;
     internal::Timer timer;
 
     trajectory_t the_trajectory = read_trajectory_from_file<space>(infilename);
@@ -139,7 +139,7 @@ int main(int argc, char** argv) {
         std::cout << " Efficacy: " << eff << "\n";
     }
     else if (mode == cluster_mode::aided_means){
-        clustering_algo.perform_aided_means_clustering(infilename, samplefilename, frequency_threshold);
+        clustering_algo.perform_aided_partially_simplified_means_clustering(infilename, samplefilename, frequency_threshold, config.curve_simplification_factor);
         auto eff = clustering_algo.compute_means_efficacy();
         std::cout << " Efficacy: " << eff << "\n"; 
     }
@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
 
     }
     else if (mode==cluster_mode::aided_means_k_random){
-        clustering_algo.perform_aided_means_clustering_k_random(infilename, samplefilename, frequency_threshold, k, seed);
+        clustering_algo.perform_aided_partially_simplified_means_clustering_k_random(infilename, samplefilename, frequency_threshold, config.curve_simplification_factor, k, seed);
         auto eff = clustering_algo.compute_means_efficacy();
         std::cout << " Efficacy: " << eff << "\n"; 
     }
