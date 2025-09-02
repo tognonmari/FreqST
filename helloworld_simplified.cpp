@@ -65,7 +65,7 @@ int main(int argc, char** argv){
     
     
     trajectory_t dataset = read_trajectory_from_file<space>(infilename);
-
+    trajectory_t total_trajectory = read_trajectory_from_file<space>(pathlet_file_name);
     std::cout << "Num trajectories in the sample is "<< dataset.num_trajectories()<<std::endl;
     //frechet::internal::curve_simplification<space> dataset_simplification(dataset,radius * radius, curve_simplification_factor);
                 //std::cout <<"Parsed a transaction."<<std::endl;
@@ -75,7 +75,7 @@ int main(int argc, char** argv){
     
     auto start = chrono::high_resolution_clock::now();
     algo.compute_all_frequent_pathlets();
-    algo.unsimplify_collected_pathlets();
+    algo.unsimplify_collected_pathlets(total_trajectory);
     //algo.compute_all_frequent_pathlets();
     auto stop =  chrono::high_resolution_clock::now();
     
