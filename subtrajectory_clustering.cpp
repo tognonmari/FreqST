@@ -36,7 +36,7 @@ enum class cluster_mode {
 
 int main(int argc, char** argv) {
     std::array<distance_t, 2> distance_limits{-1, -1}; // negative number -> compute the global minimum / maximum distance and use that.
-    std::array<distance_t, 3> efficacy_factors{1.0, 0.00003, 2717};     // These default weights correspond to values used by Agarwal et al. (PODS'18)
+    std::array<distance_t, 3> efficacy_factors{1.0, 0.00003, 128};     // These default weights correspond to values used by Agarwal et al. (PODS'18)
     bool ignore_point_clusters_in_efficacy = false;
     rightstep_config config;
     int max_threads = 1;

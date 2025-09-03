@@ -251,7 +251,7 @@ public:
         clustering_algos.front()->drop_inefficient_clusters_means(efficacy_factors);
         pathlets = clustering_algos.front()->get_clusters();
     }
-    void perform_aided_means_clustering_trying_all_pathlets(std::string infilename, std::string samplefilename,float frequency_threshold){
+    void perform_aided_means_clustering_trying_all_pathlets(std::string infilename, std::string samplefilename, float frequency_threshold){
         std::cout<< "Performing sample aided clustering..." << std::endl;
         // The distance isn't fixed yet, so we will multiply with it later.
         config.cost_per_pathlet = efficacy_factors.c_2 / efficacy_factors.c_1; 
@@ -807,7 +807,7 @@ public:
         //float frequency_threshold = 0.05;
         frequent_subtrajectory_algo_simplified<space> temp_algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
         temp_algo.compute_maximal_frequent_pathlets();
-        temp_algo.unsimplify_collected_pathlets();
+        temp_algo.unsimplify_collected_pathlets(trajectory);
         //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
         std::swap(temp_algo.freq_pathlets, max_freq_pathlets_by_distance.at(sq_distances.size()-1));
         //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
@@ -832,7 +832,7 @@ public:
             //float frequency_threshold = 0.05;
             frequent_subtrajectory_algo_simplified<space> algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
             algo.compute_maximal_frequent_pathlets();
-            algo.unsimplify_collected_pathlets();
+            algo.unsimplify_collected_pathlets(trajectory);
             //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
             std::swap(algo.freq_pathlets, max_freq_pathlets_by_distance.at(i));
             //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
@@ -1002,7 +1002,7 @@ public:
         //float frequency_threshold = 0.05;
         frequent_subtrajectory_algo_simplified<space> temp_algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
         temp_algo.compute_maximal_frequent_pathlets();
-        temp_algo.unsimplify_collected_pathlets();
+        temp_algo.unsimplify_collected_pathlets(trajectory);
         //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
         std::swap(temp_algo.freq_pathlets, max_freq_pathlets_by_distance.at(sq_distances.size()-1));
         //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
@@ -1027,7 +1027,7 @@ public:
             //float frequency_threshold = 0.05;
             frequent_subtrajectory_algo_simplified<space> algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
             algo.compute_maximal_frequent_pathlets();
-            algo.unsimplify_collected_pathlets();
+            algo.unsimplify_collected_pathlets(trajectory);
             //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
             std::swap(algo.freq_pathlets, max_freq_pathlets_by_distance.at(i));
             //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
@@ -1181,7 +1181,7 @@ public:
         //float frequency_threshold = 0.05;
         frequent_subtrajectory_algo_simplified<space> temp_algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
         temp_algo.compute_maximal_frequent_pathlets();
-        temp_algo.unsimplify_collected_pathlets();
+        temp_algo.unsimplify_collected_pathlets(trajectory);
         std::set<frequent_pathlet> temp_set(temp_algo.freq_pathlets.begin(), temp_algo.freq_pathlets.end());
         //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
         std::swap(temp_set, max_freq_pathlets_by_distance.at(sq_distances.size()-1));
@@ -1200,7 +1200,7 @@ public:
             //float frequency_threshold = 0.05;
             frequent_subtrajectory_algo_simplified<space> algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
             algo.compute_maximal_frequent_pathlets();
-            algo.unsimplify_collected_pathlets();
+            algo.unsimplify_collected_pathlets(trajectory);
             std::set<frequent_pathlet> temp(algo.freq_pathlets.begin(), algo.freq_pathlets.end());
 
             std::swap(temp, max_freq_pathlets_by_distance.at(i));
@@ -1370,7 +1370,7 @@ private:
         //float frequency_threshold = 0.05;
         frequent_subtrajectory_algo_simplified<space> temp_algo(sample, rs, infilename, frequency_threshold, radius, config.curve_simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
         temp_algo.compute_maximal_frequent_pathlets();
-        temp_algo.unsimplify_collected_pathlets();
+        temp_algo.unsimplify_collected_pathlets(trajectory);
         //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
         std::set<frequent_pathlet> temp(algo.freq_pathlets.begin(), algo.freq_pathlets.end());
         std::swap(temp, max_freq_pathlets_by_distance.at(sq_distances.size()-1));
