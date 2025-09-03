@@ -177,23 +177,23 @@ class frequent_subtrajectory_algo_simplified{
             outfile.close();
         }
         
-        void unsimplify_collected_pathlets(trajectory_t& entire_dataset_for_query){
-            frechet::internal::curve_simplification<space> cs(entire_dataset_for_query, distance_threshold, curve_simplification_factor);
+        void unsimplify_collected_pathlets(trajectory_t& original_traj){
+            frechet::internal::curve_simplification<space> cs(original_traj, distance_threshold * distance_threshold, curve_simplification_factor);
             for (auto& p: this->freq_pathlets){
                 
                 //from frequent pathlets to indexes in trajectories 
                 subtrajectory_t offsets = p.extremes;
-                index_t initial_point = entire_dataset_for_query.get_first_point_in_trajectory(p.pathlet_mother);
-                
-                //std::cout << "Initial point for trajectory "<< p.pathlet_mother << "is" << simplification.trajectory().get_first_point_in_trajectory(2)<< std::endl;
+                index_t initial_point = cs.trajectory().get_first_point_in_trajectory(p.pathlet_mother);
+                //assert(cs.trajectory().get_first_point_in_trajectory(p.pathlet_mother)==simplification.trajectory().get_first_point_in_trajectory(p.pathlet_mother));
+                std::cout << "Initial point for trajectory "<< p.pathlet_mother << "is" << simplification.trajectory().get_first_point_in_trajectory(2)<< std::endl;
                 subtrajectory_t st{initial_point+offsets.first, initial_point+ offsets.second};
                 //Now unsimplify st
                 std::optional<curve_simplification_cluster_summary_t> c = curve_simplification_cluster_summary_t{0,0,0.0,st.first,st.second};
-                //std::cout <<"Unsimplifying Pathlet "<<p.extremes.first << " "<< p.extremes.second << " with mother "<< p.pathlet_mother<< std::endl;
-                //std::cout << "This corresponds to subtrajectory "<< st.first << " "<< st.second << std::endl;
+                std::cout <<"Unsimplifying Pathlet "<<p.extremes.first << " "<< p.extremes.second << " with mother "<< p.pathlet_mother<< std::endl;
+                std::cout << "This corresponds to subtrajectory "<< st.first << " "<< st.second << std::endl;
                 std::optional<curve_simplification_cluster_summary_t> temp = cs.unsimplify(c);
-                p.extremes.first = temp.value().left_column - entire_dataset_for_query.get_first_point_in_trajectory(p.pathlet_mother);
-                p.extremes.second = temp.value().right_column - entire_dataset_for_query.get_first_point_in_trajectory(p.pathlet_mother);
+                p.extremes.first = temp.value().left_column - original_traj.get_first_point_in_trajectory(p.pathlet_mother);
+                p.extremes.second = temp.value().right_column - original_traj.get_first_point_in_trajectory(p.pathlet_mother);
 
             }
 
