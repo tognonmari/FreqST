@@ -183,7 +183,7 @@ class frequent_subtrajectory_algo_simplified{
                 
                 //from frequent pathlets to indexes in trajectories 
                 subtrajectory_t offsets = p.extremes;
-                index_t initial_point = entire_dataset_for_query.get_first_point_in_trajectory(p.pathlet_mother);
+                index_t initial_point = cs.trajectory().get_first_point_in_trajectory(p.pathlet_mother);
                 
                 //std::cout << "Initial point for trajectory "<< p.pathlet_mother << "is" << simplification.trajectory().get_first_point_in_trajectory(2)<< std::endl;
                 subtrajectory_t st{initial_point+offsets.first, initial_point+ offsets.second};
