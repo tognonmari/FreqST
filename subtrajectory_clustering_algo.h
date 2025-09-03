@@ -251,7 +251,7 @@ public:
         clustering_algos.front()->drop_inefficient_clusters_means(efficacy_factors);
         pathlets = clustering_algos.front()->get_clusters();
     }
-    void perform_aided_means_clustering_trying_all_pathlets(std::string infilename, std::string samplefilename){
+    void perform_aided_means_clustering_trying_all_pathlets(std::string infilename, std::string samplefilename,float frequency_threshold){
         std::cout<< "Performing sample aided clustering..." << std::endl;
         // The distance isn't fixed yet, so we will multiply with it later.
         config.cost_per_pathlet = efficacy_factors.c_2 / efficacy_factors.c_1; 

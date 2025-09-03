@@ -178,7 +178,7 @@ class frequent_subtrajectory_algo_simplified{
         }
         
         void unsimplify_collected_pathlets(){
-
+            
             for (auto& p: this->freq_pathlets){
                 
                 //from frequent pathlets to indexes in trajectories 
