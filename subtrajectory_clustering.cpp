@@ -36,7 +36,7 @@ enum class cluster_mode {
 
 int main(int argc, char** argv) {
     std::array<distance_t, 2> distance_limits{-1, -1}; // negative number -> compute the global minimum / maximum distance and use that.
-    std::array<distance_t, 3> efficacy_factors{1.0, 0.00003, 2717};     // These default weights correspond to values used by Agarwal et al. (PODS'18)
+    std::array<distance_t, 3> efficacy_factors{1.0, 0.00003, 27188};     // These default weights correspond to values used by Agarwal et al. (PODS'18)
     bool ignore_point_clusters_in_efficacy = false;
     rightstep_config config;
     int max_threads = 1;
@@ -139,7 +139,16 @@ int main(int argc, char** argv) {
         std::cout << " Efficacy: " << eff << "\n";
     }
     else if (mode == cluster_mode::aided_means){
-        clustering_algo.perform_aided_partially_simplified_means_clustering(infilename, samplefilename, frequency_threshold, config.curve_simplification_factor);
+
+        if (config.curve_simplification_factor == 0){
+
+            clustering_algo.perform_aided_means_clustering(infilename, samplefilename, frequency_threshold);
+
+        }
+        else{ 
+
+            clustering_algo.perform_aided_simplified_means_clustering(infilename, samplefilename, frequency_threshold, config.curve_simplification_factor);
+        }
         auto eff = clustering_algo.compute_means_efficacy();
         std::cout << " Efficacy: " << eff << "\n"; 
     }
@@ -151,7 +160,17 @@ int main(int argc, char** argv) {
 
     }
     else if (mode==cluster_mode::aided_means_k_random){
-        clustering_algo.perform_aided_partially_simplified_means_clustering_k_random(infilename, samplefilename, frequency_threshold, config.curve_simplification_factor, k, seed);
+
+        if(config.curve_simplification_factor == 0){
+            std::cout<< "I AM HERE"<<std::endl;
+            clustering_algo.perform_aided_means_clustering_k_random(infilename, samplefilename, frequency_threshold, k,seed );
+
+        }
+        else{
+
+            clustering_algo.perform_aided_partially_simplified_means_clustering_k_random(infilename, samplefilename, frequency_threshold, config.curve_simplification_factor, k, seed);
+        }
+        
         auto eff = clustering_algo.compute_means_efficacy();
         std::cout << " Efficacy: " << eff << "\n"; 
     }
