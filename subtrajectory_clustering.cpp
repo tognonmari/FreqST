@@ -139,6 +139,7 @@ int main(int argc, char** argv) {
         std::cout << " Efficacy: " << eff << "\n";
     }
     else if (mode == cluster_mode::aided_means){
+        
         clustering_algo.perform_aided_partially_simplified_means_clustering(infilename, samplefilename, frequency_threshold, config.curve_simplification_factor);
         auto eff = clustering_algo.compute_means_efficacy();
         std::cout << " Efficacy: " << eff << "\n"; 
