@@ -619,6 +619,7 @@ public:
             max_freq_pathlets_by_distance.emplace_back();
             std::cout<< "Finished Initializing for distance "<<dist << std::endl;
         }
+        first_uncovered_pathlet_by_distance.reserve(sq_distances.size());
         std::cout<< "Initialized data structures for aided means clustering." << std::endl;
         //Do the sampling and initialization of the vector of frequent sts: we use the same chenoff sample?? For now, yes
         //Generate the sample
@@ -635,7 +636,7 @@ public:
         //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
         std::swap(temp_algo.freq_pathlets, max_freq_pathlets_by_distance.at(sq_distances.size()-1));
         //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
-        std::sort(max_freq_pathlets_by_distance[sq_distances.size()-1].begin(), max_freq_pathlets_by_distance[sq_distances.size()-1].end(), pathlet_sorter_by_frequency);
+        std::sort(max_freq_pathlets_by_distance[sq_distances.size()-1].begin(), max_freq_pathlets_by_distance[sq_distances.size()-1].end(), pathlet_sorter_by_length);
         std::cout <<(max_freq_pathlets_by_distance[sq_distances.size()-1].size())<<std::endl;
         //auto rng = std::default_random_engine {};
         //std::ranges::shuffle(max_freq_pathlets_by_distance.at(i), rng);
