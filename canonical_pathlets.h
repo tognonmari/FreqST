@@ -17,7 +17,7 @@ class PathletNode{
     public:
         bool isNULL;
         bool frequent;
-        float frequency;
+        float frequency= 0.0;
         const subtrajectory_t pathlet;
 
         PathletNode(const int left, const int right) : pathlet({left, right}), frequent(true), isNULL(false){}
@@ -122,7 +122,7 @@ class BinaryPathletTree{
 
         }*/
         
-        PathletNode getNodeAt(int node_idx){
+        PathletNode& getNodeAt(int node_idx){
 
             assert(node_idx < pathlet_collection.size());
             return pathlet_collection.at(node_idx);

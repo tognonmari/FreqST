@@ -130,6 +130,22 @@ public:
         return result;
     }
 
+    //Check if it works with non-consecutive ids too.
+    
+    trajectory_collection slice_trajectory_by_id(id_t id){
+
+        trajectory_collection result;
+        index_t start = get_first_point_in_trajectory(id);
+        for (index_t i = start; i<actual_size && get_id_at(i)== id; i++){
+
+            result.push_back((*this)[i], id, true);
+
+        }
+        return result; 
+    }
+    
+    
+    
     // Compute the sum of fractions of uncovered vertices per trajectory given the collection of clusters `all_clusters`.
     //
     // `all_clusters` should be a collection of `subtrajectory_cluster<metric_space>`.
