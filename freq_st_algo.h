@@ -51,7 +51,7 @@ class freq_subtrajectory_sampler{
 
             (this->sampled_trajs_ids).clear();
 
-            int sample_size = (int) (3 / (epsilon * epsilon)) * log(2 * this->total_pathlet_number_respecting_ids() / delta);
+            int sample_size = (int) (3 *4 / (epsilon * epsilon)) * log(2 * this->total_pathlet_number_respecting_ids() / delta);
             std::cout << "Chernoff sample size with espilon "<<epsilon << ",delta "<< delta <<" is: "<< sample_size <<std::endl;
             //Step 2: assert sampling is worthwhile
             if(sample_size > the_trajectory.num_trajectories()){
@@ -253,8 +253,9 @@ class freq_subtrajectory_sampler{
         index_t j = the_trajectory.get_first_point_in_trajectory(id%n);
         
         while( the_trajectory.get_id_at(j) == id%n){
-            j++;
+            
             fout << the_trajectory[j].x()<< " "<< the_trajectory[j].y()<<" "<< id<<std::endl;
+            j++;
         }
 
         return;
@@ -272,7 +273,7 @@ class freq_subtrajectory_sampler{
         return total;
 
     }
-    //return type should be void-> TODO:correct this!!!
+    
     void sample_trajectories(int sample_size){
 
         if(! sampled_trajs_ids.empty()){
@@ -282,14 +283,13 @@ class freq_subtrajectory_sampler{
         }
         std::vector<id_t> indexes;
         int n = the_trajectory.num_trajectories();
-        for (int i = 0; i< n; i++){
+        for (int i = 1; i< n; i++){
 
             indexes.push_back(i);
 
         }
-        auto rng = std::default_random_engine {};
-        rng.seed(this->seed);
-        std::ranges::shuffle(indexes, rng);
+        
+        std::ranges::shuffle(indexes, this->mt);
         // Extract sampled ids
         for (int i = 0; i < sample_size; i++){
 
@@ -391,7 +391,6 @@ class frequent_subtrajectory_algo{
             std::cout << sampled_traj.num_trajectories_not_consecutive()<< std::endl;
             std::cout<<"Frequency threshold is "<< frequency_threshold << std::endl;
             this->integer_frequency_threshold = ceil(frequency_threshold *((int)sampled_traj.num_trajectories_not_consecutive()));
-            this->integer_frequency_threshold = ceil(frequency_threshold *( (int)sampled_traj.num_trajectories_not_consecutive()));
             std::cout << "THE INTEGER FREQ THRESHOLD IS "<< this->integer_frequency_threshold<<std::endl;
             this-> last_parsed_trajectory = -1;
             this-> distance_threshold = distance_thresh;
