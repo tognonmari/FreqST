@@ -162,7 +162,7 @@ int main(int argc, char** argv) {
     else if (mode==cluster_mode::aided_means_k_random){
 
         if(config.curve_simplification_factor == 0){
-            //std::cout<< "I AM HERE"<<std::endl;
+            std::cout<< "I AM HERE"<<std::endl;
             clustering_algo.perform_aided_means_clustering_k_random(infilename, samplefilename, frequency_threshold, k,seed );
 
         }
