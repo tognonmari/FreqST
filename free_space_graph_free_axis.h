@@ -75,7 +75,7 @@ public:
         highest_in_last_col = nullptr;
         right_column = new_right_column;
     }
-    //TODO: I should add checks here to control the id at and make this always id-respecting
+    //Adds a new point to the fsg and connects it only to vertices with the same trajectory id in the_traj
     void add_zero_with_id_respecting_labels(row_index_t row_idx, trajectory_t& the_traj){
 
         assert((highest_in_last_col == nullptr) || (highest_in_last_col->row_index < row_idx));
@@ -117,38 +117,91 @@ public:
 
     }
 
+    // Prints the fsg. Must be read from bottom-right to top left. 
+    //it is upside down w.r.t. the standard representations of free space graphs 
+    std::string to_string(const trajectory_t &sample, subtrajectory_t& chunk){
 
-    void add_zero(row_index_t row_idx) {
-        INCREMENT_COUNT(zeroes);
+
+        //Detect the width and the height of the fsg
+        int width = lowest_vertex_per_column.size() -1;
+        if (width <= 0){
+            return "############## EMPTY FSG ##############\n";
+        }
+        index_t current_row = std::numeric_limits<unsigned>::max();
+        index_t highest_height =0;
+        std::vector<vertex*> highest_vertex_per_column;
+        id_t current_visiting_trajectory;
         
-        assert((highest_in_last_col == nullptr) || (highest_in_last_col->row_index < row_idx));
-        auto *new_vertex = vertex_pool.construct(row_idx);
-        if (lowest_vertex_per_column.back() == nullptr) {
-            lowest_vertex_per_column.back() = new_vertex;
-        }
-        if (right_column > 0) {
-            advance_candidate_for_left(row_idx);
-            if (candidate_for_left != nullptr && candidate_for_left->row_index == row_idx) {
-                new_vertex->left = candidate_for_left;
-                new_vertex->label_left = candidate_for_left->min_label;
+        
+        for (int j =0; j<lowest_vertex_per_column.size(); j++){
+
+            if (lowest_vertex_per_column[j]==nullptr){
+                continue;
             }
-            if (candidate_for_below_left != nullptr && candidate_for_below_left->row_index == row_idx - 1) {
-                new_vertex->below_left = candidate_for_below_left;
-                new_vertex->label_below_left = candidate_for_below_left->min_label;
+            
+            auto it = lowest_vertex_per_column.at(j);
+            
+            row_index_t temp_index;
+            while(it != nullptr){
+                temp_index = it->row_index;
+                if(temp_index > highest_height){
+                    
+                    highest_height = temp_index;
+                    
+
+                }
+                
+                it = it->up;
+                
+            }
+
+        }
+        
+               
+        
+        //Find Lowest Row 
+        std::vector<vertex*> next_to_be_visited;
+        next_to_be_visited.reserve(lowest_vertex_per_column.size());
+        for (int j=0; j <lowest_vertex_per_column.size(); j++){
+
+            next_to_be_visited.push_back(lowest_vertex_per_column[j]);
+
+            if (lowest_vertex_per_column[j]!=nullptr && lowest_vertex_per_column[j]->row_index<current_row){
+
+                current_row = lowest_vertex_per_column[j]->row_index;
+                current_visiting_trajectory = sample.get_id_at(lowest_vertex_per_column[j]->row_index);
+                
             }
         }
-        if (highest_in_last_col != nullptr) {
-            new_vertex->below = highest_in_last_col;
-            new_vertex->label_below = highest_in_last_col->row_index == row_idx - 1 ? highest_in_last_col->min_label
-                                                                                    : vertex::no_edge_label;
-            highest_in_last_col->up = new_vertex;
+
+        std::string s = "################## UPSIDE-DOWN FSG ( paths from bottom-right to upper-left )##################\n";
+        //MISSING matching rows all below 
+        index_t initial_row = chunk.first;
+        current_visiting_trajectory = sample.get_id_at(chunk.first);
+        for (unsigned i = chunk.first; i<=chunk.second; i++){
+            if(current_visiting_trajectory !=sample.get_id_at(i)){
+                current_visiting_trajectory=sample.get_id_at(i);
+                s+= "-----------------------------\n";
+
+            }
+            s = s +std::string("TID : ") + std::to_string(sample.get_id_at(i))+std::string( " ROW ")+  std::to_string(i)+ std::string(" : ");
+            for (int j=0; j< lowest_vertex_per_column.size(); j++){
+                assert(next_to_be_visited[j]==nullptr || next_to_be_visited[j]->row_index>=i);
+                if(next_to_be_visited[j]==nullptr || next_to_be_visited[j]->row_index>i){
+                    s+=std::string("X");
+                }
+                else{
+                    s+=std::string("0");
+                    next_to_be_visited[j] =  next_to_be_visited[j]->up;
+                }
+            }
+            
+            s+= '\n';
         }
-        highest_in_last_col = new_vertex;
-        new_vertex->min_label = std::min({new_vertex->label_left,
-                                          new_vertex->label_below_left,
-                                          new_vertex->label_below,
-                                          right_column});
+        return s;
+
     }
+    
     /**
      * void delete_column() {
         auto *delete_ptr = lowest_vertex_per_column.front();
@@ -227,11 +280,9 @@ public:
     }
      */
     
-
     // FOR FREQUENT SUBTRAJECTORIES 
-    int query_one_pathlet_over_the_sample_no_queues(const trajectory_t &sample, const subtrajectory_t &pathlet){
-
-        //assert(output_trajectories.empty());
+    
+    std::set<id_t> query_one_pathlet_over_the_sample_with_labels_by_slice(const trajectory_t&sample, const subtrajectory_t &pathlet, int integer_threshold, const subtrajectory_t& slice){
         
         int counter = 0;
         // It starts from the lowest 0 in the rightmost column of the pathlet, columns are indexed just like the points in the pathlet_mother. In the below fsg, if the pathlet is 0-2 it starts from the only zero along the lowest row.
@@ -245,79 +296,11 @@ public:
         this->left_column = pathlet.first;
         this->right_column  = pathlet.second;
         vertex* end_vertex = nullptr;
+        std::set<id_t> matching_ids;
         //If start_vertex == nullptr it means that the right extreme of the pathlet is not close enough to any point in the sample -> we count 0. That column of the fsg is empty.
         if(start_vertex ==nullptr){
 
-            return counter;
-        }
-
-
-        bool success = false;
-        // I need the current trajectory in order to get to know how high i have to traverse to skip to the next one., or, equivalently, if I am querying valid matches.
-        id_t current_visiting_trajectory = sample.get_id_at(start_vertex->row_index);
-        // I need the last trajectory of the sample to know if I am finishing the visit of the fsg or if there is something weird going on.
-        id_t last_trajectory_to_be_visited = sample.get_id_at(sample.total_size()-1);
-        //std::cout<<"Started visiting trajectory "<< current_visiting_trajectory<<std::endl;
-        //std::cout<<"Last trajectory "<< last_trajectory_to_be_visited<<std::endl;
-
-        auto next_row = start_vertex->row_index;
-
-        while (true) {
-            //std::cout<<"Stuck here." <<std::endl;
-            
-            bool success = find_match_with_pathlet_from_start_vertex_no_queues(sample, start_vertex,current_visiting_trajectory);
-            //std::cout << "Out of the matching function=> my segmentation fault is not there"<< std::endl;
-            if(success){
-                //std::cout<< "Success"<<std::endl;
-                //std::cout<< "found match for the pathlet" << pathlet.first<< " "<< pathlet.second <<"at trajectory "<< current_visiting_trajectory << std::endl;
-                counter++;
-
-                if(current_visiting_trajectory == last_trajectory_to_be_visited ){
-                    break;
-                }
-                start_vertex = find_next_eligible_vertex_after_success(start_vertex, sample, current_visiting_trajectory); 
-                if(start_vertex == nullptr)//there's nothing above me 
-                {
-                    break;
-                }
-                current_visiting_trajectory =  sample.get_id_at(start_vertex->row_index);
-                //std::cout << "after success i am moving ato traj "<< current_visiting_trajectory<< std::endl;
-            }
-            else{
-
-                start_vertex = start_vertex->up;
-                if(start_vertex == nullptr){
-
-                    break;
-                }
-                current_visiting_trajectory =  sample.get_id_at(start_vertex->row_index);
-            }
-        }
-
-        TIME_END(query_cluster);
-
-        return counter;
-
-
-    }
-    int query_one_pathlet_over_the_sample_with_labels_by_slice(const trajectory_t&sample, const subtrajectory_t &pathlet, int integer_threshold, const subtrajectory_t& slice){
-        
-        int counter = 0;
-        // It starts from the lowest 0 in the rightmost column of the pathlet, columns are indexed just like the points in the pathlet_mother. In the below fsg, if the pathlet is 0-2 it starts from the only zero along the lowest row.
-
-        // 0 0 0 0
-        // 0 1 0 1  
-        // 1 1 0 1
-
-        vertex* start_vertex = lowest_vertex_per_column.at(pathlet.second); 
-        // Departure and Arrival column indexes
-        this->left_column = pathlet.first;
-        this->right_column  = pathlet.second;
-        vertex* end_vertex = nullptr;
-        //If start_vertex == nullptr it means that the right extreme of the pathlet is not close enough to any point in the sample -> we count 0. That column of the fsg is empty.
-        if(start_vertex ==nullptr){
-
-            return counter;
+            return  matching_ids;
         }
 
 
@@ -345,7 +328,8 @@ public:
                 //std::cout<< "Success"<<std::endl;
                 //std::cout<< "found match for the pathlet" << pathlet.first<< " "<< pathlet.second <<"at trajectory "<< current_visiting_trajectory << std::endl;
                 counter++;
-                
+                matching_ids.insert(current_visiting_trajectory);
+                //std::cout<< "Found a match in trajectory "<< current_visiting_trajectory<< "for pathlet "<< pathlet.first << " "<< pathlet.second<< std::endl;
                 if(current_visiting_trajectory == last_trajectory_to_be_visited ){
                     
                     break;
@@ -372,12 +356,13 @@ public:
 
         
 
-
+        assert(counter==matching_ids.size());
         
-        return counter;
+        return matching_ids;
 
 
     }
+
     int query_one_pathlet_over_the_sample_with_labels(const trajectory_t &sample, const subtrajectory_t &pathlet, int integer_threshold){
 
         int counter = 0;
@@ -449,6 +434,39 @@ public:
 
     }
 
+    //======== LEGACY METHODS (SLOW and/or UNUSED ANYMORE) ========
+
+    void add_zero(row_index_t row_idx) {
+        INCREMENT_COUNT(zeroes);
+        
+        assert((highest_in_last_col == nullptr) || (highest_in_last_col->row_index < row_idx));
+        auto *new_vertex = vertex_pool.construct(row_idx);
+        if (lowest_vertex_per_column.back() == nullptr) {
+            lowest_vertex_per_column.back() = new_vertex;
+        }
+        if (right_column > 0) {
+            advance_candidate_for_left(row_idx);
+            if (candidate_for_left != nullptr && candidate_for_left->row_index == row_idx) {
+                new_vertex->left = candidate_for_left;
+                new_vertex->label_left = candidate_for_left->min_label;
+            }
+            if (candidate_for_below_left != nullptr && candidate_for_below_left->row_index == row_idx - 1) {
+                new_vertex->below_left = candidate_for_below_left;
+                new_vertex->label_below_left = candidate_for_below_left->min_label;
+            }
+        }
+        if (highest_in_last_col != nullptr) {
+            new_vertex->below = highest_in_last_col;
+            new_vertex->label_below = highest_in_last_col->row_index == row_idx - 1 ? highest_in_last_col->min_label
+                                                                                    : vertex::no_edge_label;
+            highest_in_last_col->up = new_vertex;
+        }
+        highest_in_last_col = new_vertex;
+        new_vertex->min_label = std::min({new_vertex->label_left,
+                                          new_vertex->label_below_left,
+                                          new_vertex->label_below,
+                                          right_column});
+    }
     int query_one_pathlet_over_the_sample(const trajectory_t &sample, const subtrajectory_t &pathlet) {
         //assert(output_trajectories.empty());
         
@@ -517,11 +535,84 @@ public:
 
         return counter;
     }
+    int query_one_pathlet_over_the_sample_no_queues(const trajectory_t &sample, const subtrajectory_t &pathlet){
 
+        //assert(output_trajectories.empty());
+        
+        int counter = 0;
+        // It starts from the lowest 0 in the rightmost column of the pathlet, columns are indexed just like the points in the pathlet_mother. In the below fsg, if the pathlet is 0-2 it starts from the only zero along the lowest row.
+
+        // 0 0 0 0
+        // 0 1 0 1  
+        // 1 1 0 1
+
+        vertex* start_vertex = lowest_vertex_per_column.at(pathlet.second); 
+        // Departure and Arrival column indexes
+        this->left_column = pathlet.first;
+        this->right_column  = pathlet.second;
+        vertex* end_vertex = nullptr;
+        //If start_vertex == nullptr it means that the right extreme of the pathlet is not close enough to any point in the sample -> we count 0. That column of the fsg is empty.
+        if(start_vertex ==nullptr){
+
+            return counter;
+        }
+
+
+        bool success = false;
+        // I need the current trajectory in order to get to know how high i have to traverse to skip to the next one., or, equivalently, if I am querying valid matches.
+        id_t current_visiting_trajectory = sample.get_id_at(start_vertex->row_index);
+        // I need the last trajectory of the sample to know if I am finishing the visit of the fsg or if there is something weird going on.
+        id_t last_trajectory_to_be_visited = sample.get_id_at(sample.total_size()-1);
+        //std::cout<<"Started visiting trajectory "<< current_visiting_trajectory<<std::endl;
+        //std::cout<<"Last trajectory "<< last_trajectory_to_be_visited<<std::endl;
+
+        auto next_row = start_vertex->row_index;
+
+        while (true) {
+            //std::cout<<"Stuck here." <<std::endl;
+            
+            bool success = find_match_with_pathlet_from_start_vertex_no_queues(sample, start_vertex,current_visiting_trajectory);
+            //std::cout << "Out of the matching function=> my segmentation fault is not there"<< std::endl;
+            if(success){
+                //std::cout<< "Success"<<std::endl;
+                //std::cout<< "found match for the pathlet" << pathlet.first<< " "<< pathlet.second <<"at trajectory "<< current_visiting_trajectory << std::endl;
+                counter++;
+
+                if(current_visiting_trajectory == last_trajectory_to_be_visited ){
+                    break;
+                }
+                start_vertex = find_next_eligible_vertex_after_success(start_vertex, sample, current_visiting_trajectory); 
+                if(start_vertex == nullptr)//there's nothing above me 
+                {
+                    break;
+                }
+                current_visiting_trajectory =  sample.get_id_at(start_vertex->row_index);
+                //std::cout << "after success i am moving ato traj "<< current_visiting_trajectory<< std::endl;
+            }
+            else{
+
+                start_vertex = start_vertex->up;
+                if(start_vertex == nullptr){
+
+                    break;
+                }
+                current_visiting_trajectory =  sample.get_id_at(start_vertex->row_index);
+            }
+        }
+
+        TIME_END(query_cluster);
+
+        return counter;
+
+
+    }
+    
+    //=============================================================
+    
     std::vector<vertex*> lowest_vertex_per_column;
-//============= STOP =========
+
 private:
-    //For Frequent trajs I could also use a different data structure, but this looks nice + i do not think the bottleneck is here
+
     lost::recycling_object_pool<vertex> vertex_pool;
     // List of the lowest vertices in each column
     // `.front()` corresponds to the lowest vertex in the `left_column`
@@ -661,6 +752,8 @@ private:
         ++row;
     }
     */
+
+    //======== LEGACY METHODS (SLOW and UNUSED ANYMORE) ========
     bool find_match_with_pathlet_from_start_vertex(const trajectory_t& sample, vertex* start_vertex, id_t trajectory_id){
 
         int next_column_idx = this->right_column-1;
@@ -806,6 +899,7 @@ private:
         }
 
     }
+    
     void enqueue_vertical_chain(std::queue<vertex*>& next_column, vertex* higher_column_vertex, id_t tid, const trajectory_t& sample){
 
         vertex* sv = higher_column_vertex;

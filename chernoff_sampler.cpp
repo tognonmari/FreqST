@@ -30,15 +30,20 @@ using distance_t = distance_function_t::distance_t;
 using range_search_t = kd_tree_range_search<space>;
 namespace chrono = std::chrono;
 enum class sampling_mode {
-    chernoff = 0,
-    vc_dim = 1
+    fixed_size = 0,
+    chernoff = 1,
+    vc = 2,
+    rough_vc = 3
 };
 
 int main(int argc, char** argv){
 
     //Step 1: initialize config variables
-    
-    float frequency_threshold, epsilon, delta;
+    int fixed_size = 1;
+
+    float epsilon = 0.1;
+    float delta = 0.05;
+
     int minimum_length = 1;
     int seed = 0;
     distance_t radius;
@@ -50,20 +55,20 @@ int main(int argc, char** argv){
     CLI::App app{"Chernoff sampler for a trajectory dataset for frequent subtrajectory mining."};
     app.add_option("-e,--epsilon",
                  epsilon,
-                 "The maximum allowed additive error on the frequency.")
-        ->required();    
+                 "The maximum allowed additive error on the frequency.");    
     app.add_option("-d,--delta",
                    delta,
-                   "Confidence parameter.")
-        ->required();
+                   "Confidence parameter.");
     app.add_option("-r,--radius",
                     radius,
-                    "The radius for the vc dimension.")
-        ->required();
+                    "The radius for the vc dimension.");
     app.add_option("input",
                    infilename,
                    "The trajectory file")
         ->required();
+    app.add_option("-c,--cardinality",
+                   fixed_size,
+                   "Fixed Size for fixed size sample generation.");
     app.add_option("-s, --seed",
                     seed,
                     "Seed for the random generator. Default is 0.");
@@ -71,25 +76,61 @@ int main(int argc, char** argv){
                    outfiledir,   
                    "The directory where the sample will be dumped.")
         ->required();
-  
+    app.add_option("-m, --mode",
+                   mode,
+                   "Sampling mode: 0 for Fixed Size, 1 for Chernoff, 2 for VC, 3 for Rough VC Estimate.")
+        ->required();
     CLI11_PARSE(app, argc, argv);   
 
-
-    std::cout << "your seed is : " << seed <<std::endl;
-    
     trajectory_t dataset = read_trajectory_from_file<space>(infilename);
     freq_subtrajectory_sampler<space> sampler(dataset, epsilon, delta, radius, minimum_length, seed );
-    //sampler.generate_fixed_size_sample(23000);
-    //sampler.dump_sample_to_file(std::format("./berlin/fixed_size_sample_23000.txt"));
+
+    switch(mode){
+        case sampling_mode::fixed_size:{
+            sampler.generate_fixed_size_sample(fixed_size);
+            sampler.dump_sample_to_file(std::format("{}/fixedsize_{}_{}.txt", outfiledir, fixed_size, seed));
+            break;
+        }
+        case sampling_mode::chernoff:{
+            sampler.generate_chernoff_sample();
+            sampler.dump_sample_to_file(std::format("{}/chernoff_{}_{}_{}.txt", outfiledir, epsilon, delta, seed));
+            break;
+        }
+        case sampling_mode::vc:{
+            sampler.generate_vc_sample();
+            sampler.dump_sample_to_file(std::format("{}/vc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
+            break;
+        }
+        case sampling_mode::rough_vc:{
+            sampler.generate_rough_vc_sample();
+            sampler.dump_sample_to_file(std::format("{}/roughvc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
+            break;
+        }
+    }
+
+    //std::cout << "your seed is : " << seed <<std::endl;
+    
+    
+    //freq_subtrajectory_sampler<space> sampler(dataset, epsilon, delta, radius, minimum_length, seed );
+    //sampler.generate_fixed_size_sample(50);
+    //sampler.dump_sample_to_file(std::format(std::format("{}/chernoff_{}_{}_{}.txt", outfiledir, epsilon, delta, seed)));
     //sampler.generate_chernoff_sample();
     //sampler.dump_sample_to_file(std::format("{}/chernoff_{}_{}_{}.txt", outfiledir, epsilon, delta, seed)); 
+    //sampler.generate_rough_vc_sample();
+
+    
+    //auto start = chrono::high_resolution_clock::now();
     //sampler.generate_vc_sample();
-    auto start = chrono::high_resolution_clock::now();
-    sampler.generate_rough_vc_sample();
-    auto end = chrono::high_resolution_clock::now();
-    auto duration = duration_cast<chrono::milliseconds>(end - start);
-    std::cout << "TIME: "<<duration.count() << std::endl;
+    //auto end = chrono::high_resolution_clock::now();
+    //auto duration = duration_cast<chrono::milliseconds>(end - start);
+    //std::cout << "TIME: "<<duration.count() << std::endl;
     //sampler.dump_sample_to_file(std::format("{}/vc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
+    //start = chrono::high_resolution_clock::now();
+    //sampler.generate_rough_vc_sample();
+    //end = chrono::high_resolution_clock::now();
+    //duration = duration_cast<chrono::milliseconds>(end - start);
+    //std::cout << "TIME: "<<duration.count() << std::endl;
+    
     //frequent_subtrajectory_algo_t algo(dataset, infilename, 0.4, 50); 
     //algo.populate_range_search_tree_with_sample_points();
 
