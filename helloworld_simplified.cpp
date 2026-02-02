@@ -65,7 +65,7 @@ int main(int argc, char** argv){
     
     
     trajectory_t dataset = read_trajectory_from_file<space>(infilename);
-
+    trajectory_t to_unsimplify = read_trajectory_from_file<space>(pathlet_file_name);
     std::cout << "Num trajectories in the sample is "<< dataset.num_trajectories()<<std::endl;
     //frechet::internal::curve_simplification<space> dataset_simplification(dataset,radius * radius, curve_simplification_factor);
                 //std::cout <<"Parsed a transaction."<<std::endl;
@@ -74,8 +74,8 @@ int main(int argc, char** argv){
     frequent_subtrajectory_algo_t algo(dataset, rs, pathlet_file_name, frequency_threshold, radius, curve_simplification_factor); 
     
     auto start = chrono::high_resolution_clock::now();
-    algo.compute_all_frequent_pathlets();
-    algo.unsimplify_collected_pathlets();
+    algo.compute_maximal_frequent_pathlets_with_trajectory_slicing();
+    algo.unsimplify_collected_pathlets(to_unsimplify);
     //algo.compute_all_frequent_pathlets();
     auto stop =  chrono::high_resolution_clock::now();
     

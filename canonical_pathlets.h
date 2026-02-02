@@ -127,7 +127,23 @@ class BinaryPathletTree{
             //top-down visit of the tree 
 
         }*/
-
+        std::string toString(){
+            
+            std::string s = "Binary Pathlet Tree : ID "+ std::to_string(this->trajectory_id)+ "\n";
+            for (int i=0; i< pathlet_collection.size(); i++){
+                PathletNode p = pathlet_collection.at(i);
+                if (p.isNULL){
+                    s += std::format("Node {} Pathlet: NULL ", i);
+                }
+                else{
+                    s += std::format("Node {} Pathlet: [ {}, {}]", i, p.getPathlet().first, p.getPathlet().second);
+                }
+                
+                s += "\n";
+            }
+            s += "\n";
+            return s;
+        }
         //Given a point_idx in the support trajectory returns the node of the tree with the single-point pathlet containing it
         PathletNode getPointPathletNode(int point_idx){
         
@@ -137,6 +153,9 @@ class BinaryPathletTree{
             PathletNode current_node = pathlet_collection.at(0); // root as the first node of the visit
 
             int current_idx = 0;
+            if (current_node.getLength() ==1 && this->n ==1){
+                return current_node;
+            }
             //std::cout << "** Root pahtlet is "<< current_node.getPathlet().first << " "<< current_node.getPathlet().second<< " **"<<std::endl;
             //std::cout << " root pathelt should however be "<< pathlet_collection.at(0).getPathlet().first << " "<< pathlet_collection.at(0).getPathlet().second<< " **"<<std::endl;
             while(true){
