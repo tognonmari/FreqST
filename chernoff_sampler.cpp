@@ -41,6 +41,7 @@ int main(int argc, char** argv){
     float frequency_threshold, epsilon, delta;
     int minimum_length = 1;
     int seed = 0;
+    int fixed_size= -1;
     distance_t radius;
     std::string infilename, outfiledir;
     sampling_mode mode;
@@ -56,6 +57,9 @@ int main(int argc, char** argv){
                    delta,
                    "Confidence parameter.")
         ->required();
+    app.add_option("-c,--cardinality",
+                   fixed_size,
+                   "Fixed Size for fixed size sample generation.");
     app.add_option("-r,--radius",
                     radius,
                     "The radius for the vc dimension.")
@@ -79,17 +83,24 @@ int main(int argc, char** argv){
     
     trajectory_t dataset = read_trajectory_from_file<space>(infilename);
     freq_subtrajectory_sampler<space> sampler(dataset, epsilon, delta, radius, minimum_length, seed );
-    //sampler.generate_fixed_size_sample(23000);
+    
+    if(fixed_size >0){
+        sampler.generate_fixed_size_sample(fixed_size);
+        sampler.dump_sample_to_file(std::format("{}/fixedsize_{}_{}.txt", outfiledir, fixed_size, seed)); 
+    }
     //sampler.dump_sample_to_file(std::format("./berlin/fixed_size_sample_23000.txt"));
     //sampler.generate_chernoff_sample();
     //sampler.dump_sample_to_file(std::format("{}/chernoff_{}_{}_{}.txt", outfiledir, epsilon, delta, seed)); 
     //sampler.generate_vc_sample();
-    auto start = chrono::high_resolution_clock::now();
-    sampler.generate_rough_vc_sample();
-    auto end = chrono::high_resolution_clock::now();
-    auto duration = duration_cast<chrono::milliseconds>(end - start);
-    std::cout << "TIME: "<<duration.count() << std::endl;
-    //sampler.dump_sample_to_file(std::format("{}/vc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
+    
+    
+    //auto start = chrono::high_resolution_clock::now();
+    //sampler.generate_rough_vc_sample();
+    //auto end = chrono::high_resolution_clock::now();
+    //auto duration = duration_cast<chrono::milliseconds>(end - start);
+    //std::cout << "TIME: "<<duration.count() << std::endl;
+    //sampler.dump_sample_to_file(std::format("{}/modifiedvc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
+    
     //frequent_subtrajectory_algo_t algo(dataset, infilename, 0.4, 50); 
     //algo.populate_range_search_tree_with_sample_points();
 

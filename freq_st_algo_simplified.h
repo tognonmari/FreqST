@@ -185,12 +185,12 @@ class frequent_subtrajectory_algo_simplified{
                 subtrajectory_t offsets = p.extremes;
                 index_t initial_point = cs.trajectory().get_first_point_in_trajectory(p.pathlet_mother);
                 //assert(cs.trajectory().get_first_point_in_trajectory(p.pathlet_mother)==simplification.trajectory().get_first_point_in_trajectory(p.pathlet_mother));
-                std::cout << "Initial point for trajectory "<< p.pathlet_mother << "is" << simplification.trajectory().get_first_point_in_trajectory(2)<< std::endl;
+                //std::cout << "Initial point for trajectory "<< p.pathlet_mother << "is" << simplification.trajectory().get_first_point_in_trajectory(2)<< std::endl;
                 subtrajectory_t st{initial_point+offsets.first, initial_point+ offsets.second};
                 //Now unsimplify st
                 std::optional<curve_simplification_cluster_summary_t> c = curve_simplification_cluster_summary_t{0,0,0.0,st.first,st.second};
-                std::cout <<"Unsimplifying Pathlet "<<p.extremes.first << " "<< p.extremes.second << " with mother "<< p.pathlet_mother<< std::endl;
-                std::cout << "This corresponds to subtrajectory "<< st.first << " "<< st.second << std::endl;
+                //std::cout <<"Unsimplifying Pathlet "<<p.extremes.first << " "<< p.extremes.second << " with mother "<< p.pathlet_mother<< std::endl;
+                //std::cout << "This corresponds to subtrajectory "<< st.first << " "<< st.second << std::endl;
                 std::optional<curve_simplification_cluster_summary_t> temp = cs.unsimplify(c);
                 p.extremes.first = temp.value().left_column - original_traj.get_first_point_in_trajectory(p.pathlet_mother);
                 p.extremes.second = temp.value().right_column - original_traj.get_first_point_in_trajectory(p.pathlet_mother);
@@ -354,7 +354,7 @@ class frequent_subtrajectory_algo_simplified{
 
                     }
 
-                    int count = fsg.query_one_pathlet_over_the_sample_with_labels(sample, pn.getPathlet()); //SF IS HERE
+                    int count = fsg.query_one_pathlet_over_the_sample_with_labels(sample, pn.getPathlet(), this->integer_frequency_threshold); //SF IS HERE
                     
                     if(count < this->integer_frequency_threshold){
                         

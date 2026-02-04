@@ -160,7 +160,7 @@ class freq_subtrajectory_sampler{
             else{
 
                 // Append the result up to now to c
-                c.push_back(floor(log2(counter) + 1));
+                c.push_back(floor(log2(counter*(1.0-1/counter)) + 2));
                 //initialize the set again 
                 counter = 0;
                 last_seen_trajectory = the_trajectory.get_id_at(i);
@@ -216,7 +216,7 @@ class freq_subtrajectory_sampler{
             else{
 
                 // Append the result up to now to c
-                c.push_back(floor(log2(traj_set.size()) + 1));
+                c.push_back(floor(log2(traj_set.size()*(1.0-traj_set.size())) + 2));
                 //initialize the set again 
                 traj_set.clear();
                 last_seen_trajectory = the_trajectory.get_id_at(i);
@@ -416,7 +416,7 @@ class frequent_subtrajectory_algo{
             std::ifstream input_stream(this->dataset_location);
 
             int sample_size = this->sample.num_trajectories_not_consecutive();
-            int chunk_size = 100;//int(this-> sample.num_trajectories_not_consecutive()/50);
+            int chunk_size = 100;
             
             
             while(!input_stream.eof()){
