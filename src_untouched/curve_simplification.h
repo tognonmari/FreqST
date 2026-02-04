@@ -42,10 +42,10 @@ public:
 
     std::optional<cluster_summary_t> unsimplify(std::optional<cluster_summary_t> cluster) const {
         if (cluster) {
-            std::cerr << "    Unsimplify [" << cluster->left_column << "," << cluster->right_column << "] to ";
+            //std::cerr << "    Unsimplify [" << cluster->left_column << "," << cluster->right_column << "] to ";
             cluster->left_column = original_leftmost_index[cluster->left_column];
             cluster->right_column = original_leftmost_index[cluster->right_column] + point_weights_[cluster->right_column] - 1;
-            std::cerr << "[" << cluster->left_column << "," << cluster->right_column << "]\n";
+            //std::cerr << "[" << cluster->left_column << "," << cluster->right_column << "]\n";
         }
         return cluster;
     }
@@ -71,7 +71,7 @@ public:
     const weights_t& point_weights() const {
         return point_weights_;
     }
-    const trajectory_t& trajectory() const {
+    const trajectory_t& trajectory() const{
         return simplified_trajectory;
     }
     range_search_t& range_search() {

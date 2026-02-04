@@ -74,13 +74,14 @@ int main(int argc, char** argv){
     frequent_subtrajectory_algo_t algo(dataset, rs, pathlet_file_name, frequency_threshold, radius, curve_simplification_factor); 
     
     auto start = chrono::high_resolution_clock::now();
-    algo.compute_maximal_frequent_pathlets_with_trajectory_slicing();
-    algo.unsimplify_collected_pathlets(to_unsimplify);
-    //algo.compute_all_frequent_pathlets();
+    algo.compute_all_frequent_pathlets_with_trajectory_slicing();
     auto stop =  chrono::high_resolution_clock::now();
     
     auto duration = duration_cast<chrono::milliseconds>(stop - start);
     std::cout<< "TIME : "<< duration.count()<< std::endl;
+    algo.unsimplify_collected_pathlets(to_unsimplify);
+    //algo.compute_all_frequent_pathlets();
+   
     
     algo.dump_collected_pathlets_to_file(outfilename);
 

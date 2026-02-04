@@ -496,7 +496,7 @@ class frequent_subtrajectory_algo{
         frequent_subtrajectory_algo(trajectory_t& sampled_traj, range_search_t& search, std::string dataset_file, float frequency_threshold, distance_t distance_thresh) : search(search) {
             this->sample = sampled_traj; //I keep the original sample, I will build the simplification later in the constructor
             this->dataset_location = dataset_file;
-
+            this->min_length = 4;
             std::cout << sampled_traj.num_trajectories_not_consecutive()<< std::endl;
             std::cout<<"Frequency threshold is "<< frequency_threshold << std::endl;
             this->integer_frequency_threshold = ceil(frequency_threshold *((int)sampled_traj.num_trajectories_not_consecutive()));
@@ -585,9 +585,11 @@ class frequent_subtrajectory_algo{
             while(!input_stream.eof()){
                 //One pathlet tree at a time
                 trajectory_t pathlet_mother = this->read_next_transaction_from_file(input_stream);
-
-                BinaryPathletTree pathlet_tree(pathlet_mother, pathlet_mother.get_id_at(0),floor(log2(pathlet_mother.total_size())) + 1,1);
+                
+                BinaryPathletTree pathlet_tree(pathlet_mother, pathlet_mother.get_id_at(0),floor(log2(pathlet_mother.total_size())) + 1,this->min_length);
                 //std::cout <<"The transaction has id "<< pathlet_mother.get_id_at(0) <<std::endl;
+                //std::cout << pathlet_tree.toString() << std::endl;
+                
                 bool no_frequent_for_this_tree = false;
                 int num_visited_trajectories = 0;
                 id_t next_first_id_of_chunk= this->sample.get_id_at(0);
@@ -1000,10 +1002,10 @@ class frequent_subtrajectory_algo{
             for (int j = 0; j< num_col; j++){
                 // If a point is not frequent and i already know it, skip the distance computations 
                 //get the node associated to that point
-                PathletNode pn = pathlet_tree.getPointPathletNode(j);
-                if(pn.isFrequent()){
+                //PathletNode pn = pathlet_tree.getPointPathletNode(j);
+                //if(pn.isFrequent()){
                 populate_column_with_labels_for_single_slice(fsg, pathlet_mother[j], this->distance_threshold, j,slice);
-                }
+                //}
                 if(j < num_col -1){
 
                     fsg.new_column();
@@ -1286,6 +1288,7 @@ class frequent_subtrajectory_algo{
         id_t last_parsed_trajectory;
         distance_t distance_threshold;
         int integer_frequency_threshold;
+        int min_length;
         //distance_t curve_simplification_factor = 0;
         //frechet::internal::curve_simplification<space>& simplification;
 };

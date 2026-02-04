@@ -76,7 +76,7 @@ public:
         right_column = new_right_column;
     }
     //Adds a new point to the fsg and connects it only to vertices with the same trajectory id in the_traj
-    void add_zero_with_id_respecting_labels(row_index_t row_idx, trajectory_t& the_traj){
+    void add_zero_with_id_respecting_labels(row_index_t row_idx, const trajectory_t& the_traj){
 
         assert((highest_in_last_col == nullptr) || (highest_in_last_col->row_index < row_idx));
         auto *new_vertex = vertex_pool.construct(row_idx);

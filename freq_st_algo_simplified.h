@@ -118,6 +118,67 @@ class frequent_subtrajectory_algo_simplified{
 
 
         }
+        void compute_all_frequent_pathlets_with_trajectory_slicing(){
+
+            std::ifstream input_stream(this->dataset_location); //input stream that reads trajectories upon which we build the pathlets
+            int chunk_size = 50;//int(this-> sample.num_trajectories_not_consecutive()/50);
+            int sample_size = this->sample.num_trajectories_not_consecutive();
+            
+            index_t last_pt = 0;
+            while(!input_stream.eof()){
+                //One pathlet tree at a time 
+                trajectory_t pathlet_mother = this->read_next_transaction_from_file(input_stream);
+                int prev_length = pathlet_mother.total_size();
+                frechet::internal::curve_simplification<space> pathlet_simplification(pathlet_mother, this->distance_threshold * this->distance_threshold, this->curve_simplification_factor);
+                pathlet_mother = pathlet_simplification.trajectory();
+                
+                //std::cout << "I AM QUERYING PM WITH ID "<<pathlet_mother.get_id_at(0)<<" AND SIZE "<<pathlet_mother.total_size()<<std::endl;
+                BinaryPathletTree pathlet_tree(pathlet_mother, pathlet_mother.get_id_at(0),floor(log2(pathlet_mother.total_size())) + 1,1);
+                //std::cout<< pathlet_tree.toString()<< std::endl;
+                bool no_frequent_for_this_tree = false;
+                int num_visited_trajectories = 0;
+                id_t next_first_id_of_chunk= this->simplification.trajectory().get_id_at(0);
+                subtrajectory_t chunk;
+                chunk.second = 0;
+                //std::cout << "My simplified pathlet_mother is  "<< pathlet_tree.toString()<< std::endl;
+                while (chunk.second< simplification.trajectory().total_size()-1){
+
+                    num_visited_trajectories +=chunk_size;
+                    chunk = extract_chunked_slice(next_first_id_of_chunk, chunk_size);
+
+                    free_space_graph_t fsg(0);
+
+                    //POPULATE FSG
+                    //std::cout << fsg.to_string(sample,chunk) <<std::endl; 
+                    this->populate_all_columns_with_labels_for_single_slice(fsg, chunk, pathlet_mother, pathlet_tree); //Should receive pathlet tree
+                    //std::cout << fsg.to_string(simplification.trajectory(),chunk) <<std::endl; 
+                    this->query_and_update_counts_for_all_pathlets(fsg, chunk, pathlet_tree); //Query the free space graph
+                    
+                    if(!some_potentially_frequent_exists(pathlet_tree, num_visited_trajectories, sample_size)){
+                        no_frequent_for_this_tree = true;
+                        break;
+                    }
+                    //If there is another chunk to be processed
+                    if(chunk.second < simplification.trajectory().total_size()-1){
+
+                        id_t second_id = simplification.trajectory().get_id_at(chunk.second);
+
+                        next_first_id_of_chunk = simplification.trajectory().get_id_at(simplification.trajectory().get_first_point_in_trajectory(second_id) + simplification.trajectory().get_trajectory_size(second_id));
+
+                    }
+                    
+                }
+
+                //COLLECT THE FREQUENT ONES 
+                if (!no_frequent_for_this_tree){
+                //std::cout<< "I have found some frequent"<<std::endl;
+                this->collect_frequent_pathlets_from_single_tree(pathlet_tree);
+                }
+            }
+
+
+
+        }
         void compute_maximal_frequent_pathlets_with_trajectory_slicing(){
 
             std::ifstream input_stream(this->dataset_location); //input stream that reads trajectories upon which we build the pathlets
@@ -128,8 +189,12 @@ class frequent_subtrajectory_algo_simplified{
             while(!input_stream.eof()){
                 //One pathlet tree at a time 
                 trajectory_t pathlet_mother = this->read_next_transaction_from_file(input_stream);
+                int prev_length = pathlet_mother.total_size();
                 frechet::internal::curve_simplification<space> pathlet_simplification(pathlet_mother, this->distance_threshold * this->distance_threshold, this->curve_simplification_factor);
                 pathlet_mother = pathlet_simplification.trajectory();
+                if (prev_length > pathlet_mother.total_size()){
+                    std::cout <<"I am simplifying!\n";
+                }
                 //std::cout << "I AM QUERYING PM WITH ID "<<pathlet_mother.get_id_at(0)<<" AND SIZE "<<pathlet_mother.total_size()<<std::endl;
                 BinaryPathletTree pathlet_tree(pathlet_mother, pathlet_mother.get_id_at(0),floor(log2(pathlet_mother.total_size())) + 1,1);
                 std::cout<< pathlet_tree.toString()<< std::endl;
@@ -691,7 +756,7 @@ class frequent_subtrajectory_algo_simplified{
         void populate_all_columns_with_labels_for_single_slice(free_space_graph_t& fsg, subtrajectory_t& slice, trajectory_t& pathlet_mother, binary_pathlet_tree_t& pathlet_tree){
 
             int num_col = pathlet_mother.get_actual_size();
-            std::cout << "Pathlet mother has size "<< num_col <<  std::endl;
+            //std::cout << "Pathlet mother has size "<< num_col <<  std::endl;
             for (int j = 0; j< num_col; j++){
                 // If a point is not frequent and i already know it, skip the distance computations 
                 //get the node associated to that point
