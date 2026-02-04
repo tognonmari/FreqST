@@ -13,19 +13,21 @@ class PathletNode{
         using index_t = std::size_t;
         using trajectory_t = trajectory_collection<space>;
         using subtrajectory_t = trajectory_t::subtrajectory_t;
-
+        using id_t = trajectory_t::id_t;
     public:
         bool isNULL;
-        bool frequent;
+        bool frequent; //Constructor sets it to true by default
         float frequency= 0.0;
-        const subtrajectory_t pathlet;
-
-        PathletNode(const int left, const int right) : pathlet({left, right}), frequent(true), isNULL(false){}
+        subtrajectory_t pathlet;
+        std::set<id_t> supporting_trajectories;
+    
+        PathletNode(int left, int right) : pathlet({left, right}), frequent(true), isNULL(false){}
         inline int getLength(){ return this->pathlet.second - this-> pathlet.first + 1; }
         inline float getFrequency() { return this->frequency; }
         inline subtrajectory_t getPathlet(){ return this->pathlet; }
         inline bool isFrequent() { return this-> frequent; }
         inline void setNULL(){this->isNULL = true;}
+        inline void addId(id_t id){this->supporting_trajectories.insert(id);}
         //inline bool isNULL() {return this->isNULL;}
 };
 
@@ -55,17 +57,19 @@ class BinaryPathletTree{
 
             assert(this->pathlet_collection.empty()); //assert flat_tree is empty
 
-            this->build();
+            this->build(); //Fills the pathlet_collection vector, which is then explored as a binary tree
         }
 
+        //Getters
         inline int getDepth() { return this-> d;}
         inline int getMinLength() { return this-> l; }
         inline int getTrajectoryLength() {return this-> n;}
         inline int getPathletCollectionLength(){return this->pathlet_collection.size();}
-        
+        id_t getTrajectoryId(){ return this->trajectory_id; }
 
+        //Setters
         void setInfrequent(int node_idx) {
-
+            
             PathletNode& p = this-> pathlet_collection.at(node_idx);
             p.frequent = false;
             assert(p.frequent == this-> pathlet_collection.at(node_idx).isFrequent());
@@ -86,12 +90,14 @@ class BinaryPathletTree{
 
 
         }
+        
+        PathletNode& getNodeAt(int node_idx){
 
-        id_t getTrajectoryId(){ return this->trajectory_id; }
+            assert(node_idx < pathlet_collection.size());
+            return pathlet_collection.at(node_idx);
 
-        /**
-         * Retrieves ALL the pathlets currently marked as frequent in the tree. NO GUARANTEES ON THE CORRECTNESS IF THIS IS CALLED BEFORE PROCESSING.
-        */
+        }
+
         /*cluster_t retrieveFrequentPathlets(){
 
             cluster_t freq_pathlets;
@@ -121,13 +127,72 @@ class BinaryPathletTree{
             //top-down visit of the tree 
 
         }*/
-        
-        PathletNode& getNodeAt(int node_idx){
-
-            assert(node_idx < pathlet_collection.size());
-            return pathlet_collection.at(node_idx);
-
+        std::string toString(){
+            
+            std::string s = "Binary Pathlet Tree : ID "+ std::to_string(this->trajectory_id)+ "\n";
+            for (int i=0; i< pathlet_collection.size(); i++){
+                PathletNode p = pathlet_collection.at(i);
+                if (p.isNULL){
+                    s += std::format("Node {} Pathlet: NULL ", i);
+                }
+                else{
+                    s += std::format("Node {} Pathlet: [ {}, {}]", i, p.getPathlet().first, p.getPathlet().second);
+                }
+                
+                s += "\n";
+            }
+            s += "\n";
+            return s;
         }
+        //Given a point_idx in the support trajectory returns the node of the tree with the single-point pathlet containing it
+        PathletNode getPointPathletNode(int point_idx){
+        
+            //std::cout << " ***** Searching for point pathlet "<< point_idx << " *****"<< std::endl;
+            //top-down search
+            bool found = false;
+            PathletNode current_node = pathlet_collection.at(0); // root as the first node of the visit
+
+            int current_idx = 0;
+            if (current_node.getLength() ==1 && this->n ==1){
+                return current_node;
+            }
+            //std::cout << "** Root pahtlet is "<< current_node.getPathlet().first << " "<< current_node.getPathlet().second<< " **"<<std::endl;
+            //std::cout << " root pathelt should however be "<< pathlet_collection.at(0).getPathlet().first << " "<< pathlet_collection.at(0).getPathlet().second<< " **"<<std::endl;
+            while(true){
+                //exit conditions
+                assert(!current_node.isNULL);
+                if (current_node.getLength()==1 && (current_idx !=0 && this->n >1)){
+                    //assert(current_node.getPathlet().first== point_idx);
+                    //std::cout << "I am seeing a size one pathlet at point "<< current_node.getPathlet().first << " for point "<< point_idx<< std::endl;
+                    return current_node;
+                    
+                }
+                //traversal
+
+                int left_child_location = left_child_idx(current_idx);
+                PathletNode left_child = getNodeAt(left_child_location);
+                //std::cout << "** Left Child pathlet is "<< left_child.getPathlet().first << " "<< left_child.getPathlet().second<< " **"<<std::endl;
+
+                int right_child_location = right_child_idx(current_idx);
+                PathletNode right_child = getNodeAt(right_child_location);
+                //std::cout << "** Right Child pathlet is "<< right_child.getPathlet().first << " "<< right_child.getPathlet().second<< " **"<<std::endl;
+
+                if (!left_child.isNULL && point_idx >= left_child.getPathlet().first && point_idx <= left_child.getPathlet().second){
+                    current_idx = left_child_location;
+                    current_node = getNodeAt(current_idx);
+                }
+                else{
+                    //go left 
+                    current_idx = right_child_location;
+                    current_node = getNodeAt(current_idx);
+                }
+
+            }
+
+            
+        }
+
+        
 
         static inline int left_child_idx(int node_idx){
 
@@ -141,7 +206,7 @@ class BinaryPathletTree{
 
         }
 
-        private: //class variables + tree access methods
+        private: 
 
         std::vector<PathletNode> pathlet_collection; 
         int n;
@@ -150,7 +215,6 @@ class BinaryPathletTree{
         trajectory_t support;
         id_t trajectory_id;
 
-        
 
         static inline int get_father(int node_idx){
 
@@ -161,12 +225,16 @@ class BinaryPathletTree{
             return father;
         }
 
+        //Builds the binary tree of pathlets
         void build(){
+
+            //Root is the first node of vector pathlet_collection
             PathletNode root(0, this-> n - 1);
             this-> pathlet_collection.push_back(root);
             assert(pathlet_collection.size() == 1);
             int level_beginning = 1;
 
+            //Fill the vector level by level, from left to right
             for (int level =1; level <= this->d; level++){
 
                 level_beginning = (int( pow(2, level))) -1;
@@ -176,6 +244,7 @@ class BinaryPathletTree{
                     int position = level_beginning + k;
                     PathletNode parent  = this->pathlet_collection.at(get_father(position));
                     //std::cout << "Level "<< level<< "pos "<< position<< " father length "<<  pathlet_collection.at(get_father(position)).getPathlet().second- pathlet_collection.at(get_father(position)).getPathlet().first +1<< std::endl;
+                    //If the parent is a NULL pathlet (empty node of the vector) or is shorter than the mininmum length, then insert a NULL node
                     if( parent.isNULL || parent.getLength() <= this-> l){
                         
                         PathletNode nullKid(-1,-1);
@@ -183,7 +252,7 @@ class BinaryPathletTree{
                         this-> pathlet_collection.push_back(nullKid);
 
                     }
-                    else{
+                    else{ //The current parent node is valid, so create its kids
 
                         int left = parent.pathlet.first;
                         int right = parent.pathlet.second;

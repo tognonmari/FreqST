@@ -15,13 +15,13 @@
 using namespace frechet;
 namespace fs = std::filesystem;
 namespace chrono = std::chrono;
-
+ 
 using space = CGAL_metric_space<CGAL::Simple_cartesian<double>, CGAL::Dimension_tag<2>>;
 using free_space_graph_t =  free_space_graph_free_axis<space>;
 using frequent_subtrajectory_algo_t = frequent_subtrajectory_algo<space>;
 using trajectory_t = trajectory_collection<space>;
 using distance_function_t = space::distance_function_t;
-using distance_t = distance_function_t::distance_t;
+using distance_t = distance_function_t::distance_t; 
 using range_search_t = kd_tree_range_search<space>;
 
 int main(int argc, char** argv){
@@ -71,8 +71,8 @@ int main(int argc, char** argv){
     algo.compute_all_frequent_pathlets_with_trajectory_slicing();
     //algo.compute_all_frequent_pathlets();
     auto stop =  chrono::high_resolution_clock::now();
-    
-    auto duration = duration_cast<chrono::seconds>(stop - start);
+     
+    auto duration = duration_cast<chrono::milliseconds>(stop - start);
     std::cout<< "TIME : "<< duration.count()<< std::endl;
     
     algo.dump_collected_pathlets_to_file(outfilename);

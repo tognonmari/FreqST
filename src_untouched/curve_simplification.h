@@ -71,7 +71,7 @@ public:
     const weights_t& point_weights() const {
         return point_weights_;
     }
-    const trajectory_t& trajectory() const {
+    const trajectory_t& trajectory() const{
         return simplified_trajectory;
     }
     range_search_t& range_search() {
