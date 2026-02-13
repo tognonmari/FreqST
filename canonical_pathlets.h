@@ -28,7 +28,7 @@ class PathletNode{
         inline bool isFrequent() { return this-> frequent; }
         inline void setNULL(){this->isNULL = true;}
         inline void addId(id_t id){this->supporting_trajectories.insert(id);}
-        //inline bool isNULL() {return this->isNULL;}
+        inline std::set<id_t> getSupportingTrajectories(){return this->supporting_trajectories;}
 };
 
 //represents a collection of pathlets organized as a tree, based on a subtrajectory taken from a trajectory collection
@@ -98,35 +98,7 @@ class BinaryPathletTree{
 
         }
 
-        /*cluster_t retrieveFrequentPathlets(){
-
-            cluster_t freq_pathlets;
-            std::queue<int> q;
-
-            q.enqueue(0);
-
-            while(!q.empty()){
-
-                int current_visinting_index = q.dequeue();
-                PathletNode p = pathlets.at(current_visinting_index);
-                if(p == NULL){ continue; } // i am at a leaf
-                if(p.frequent){
-
-                    freq_pathlets.push_back(p.getPathlet());
-
-                }
-                else{
-
-                    q.enqueue(left_child_idx(current_visinting_index));
-                    q.enqueue(right_child_idx(current_visinting_index));
-
-                }
-            }
-            
-            return freq_pathlets;
-            //top-down visit of the tree 
-
-        }*/
+        
         std::string toString(){
             
             std::string s = "Binary Pathlet Tree : ID "+ std::to_string(this->trajectory_id)+ "\n";
