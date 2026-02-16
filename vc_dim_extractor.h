@@ -154,6 +154,7 @@ class vc_dim_extractor{
                 }
                 if (s_shattered){
                     found_shattered = true;
+                    shattered_subsets.insert(s);
                 }
             }
 
