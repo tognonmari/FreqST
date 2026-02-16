@@ -460,7 +460,7 @@ class frequent_subtrajectory_algo{
         using distance_t = distance_function_t::distance_t;
         using binary_pathlet_tree_t = BinaryPathletTree<space>;
         using range_search_t = kd_tree_range_search<space>;
-    
+        using id_t = trajectory_t::id_t;
         struct frequent_pathlet{
 
             std::pair<index_t,index_t> extremes;
@@ -578,7 +578,6 @@ class frequent_subtrajectory_algo{
             }
 
 
-
         }
 
         //FLUSH THE FREQUENT PATHLETS TO A FILE
@@ -617,7 +616,7 @@ class frequent_subtrajectory_algo{
                 for (int offset = 0; offset <=level_beginning; offset++){
 
                     int position = level_beginning + offset;
-                    PathletNode pn = pathlet_tree.getNodeAt(position);
+                    auto& pn = pathlet_tree.getNodeAt(position);
                     if(pn.isNULL){
                         
                         continue;
