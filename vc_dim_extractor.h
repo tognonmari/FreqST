@@ -109,9 +109,6 @@ class vc_dim_extractor{
                 }
                 steps.converted_supports_to_bitsets = true;
             }
-            for (auto& binary_vector : set_of_supports){
-                std::cout <<"Support with frequency "<< binary_vector.count()<<std::endl;
-            }
 
         }
         
