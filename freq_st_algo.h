@@ -18,6 +18,7 @@
 #include "trajectory.h"
 #include "canonical_pathlets.h"
 #include "curve_simplification.h"
+#include "grid_range_search.h"
 namespace frechet{
 
 struct freq_subtrajectory_algo_output_config{
@@ -32,12 +33,13 @@ class freq_subtrajectory_sampler{
 
     public:
     using space = m_space;
-    using range_search_t = kd_tree_range_search<space>;
+    
     using point_t = space::point_t;
     using distance_function_t = space::distance_function_t;
     using distance_t = distance_function_t::distance_t;
     using trajectory_t = trajectory_collection<space>;
     using index_t = trajectory_t::index_t;
+    using range_search_t = grid_range_search<space>;
     using subtrajectory_t = trajectory_t::subtrajectory_t;
     using id_t = trajectory_t::id_t;
 
@@ -147,7 +149,7 @@ class freq_subtrajectory_sampler{
 
     private:
     int rough_vc_dim(){
-        range_search_t search{the_trajectory};
+        range_search_t search{the_trajectory,0.2*distance_threshold};
         std::vector<int> c;
         index_t last_seen_trajectory = the_trajectory.get_id_at(0);
         int counter=0;
@@ -211,7 +213,7 @@ class freq_subtrajectory_sampler{
     int vc_dim(){
 
         //Compute VC Dimension 
-        range_search_t search{the_trajectory};
+        range_search_t search{the_trajectory,0.2*distance_threshold};
         std::vector<int> c;
         index_t last_seen_trajectory = the_trajectory.get_id_at(0);
         std::set<index_t> traj_set;
@@ -550,7 +552,7 @@ class frequent_subtrajectory_algo{
                     //POPULATE FSG
                     //std::cout << fsg.to_string(sample,chunk) <<std::endl; 
                     this->populate_all_columns_with_labels_for_single_slice(fsg, chunk, pathlet_mother, pathlet_tree); //Should receive pathlet tree
-                    //std::cout << fsg.to_string(sample,chunk) <<std::endl; 
+                    std::cout << fsg.to_string(sample,chunk) <<std::endl; 
                     this->query_and_update_counts_for_all_pathlets(fsg, chunk, pathlet_tree);
                                       
                     
@@ -764,7 +766,11 @@ class frequent_subtrajectory_algo{
                     if (this->output_config.keep_matching_ids){
 
                         for (id_t idd : matching_ids){
-                            //std::cout << "Pathlet "<< pn.getPathlet().first <<" "<< pn.getPathlet().second<<" has matches with tid "<< idd<< std::endl;
+                            //if(pathlet_tree.getTrajectoryId() ==951 ||pathlet_tree.getTrajectoryId() ==1854 || pathlet_tree.getTrajectoryId() ==2237){
+                            //    if (idd ==951 ||idd ==1854 || idd ==2237){
+                                    std::cout << "Pathlet "<< pn.getPathlet().first <<" "<< pn.getPathlet().second<<"of trajectory "<<pathlet_tree.getTrajectoryId()<<" has matches with tid "<< idd<< std::endl;
+                            //    }
+                            //}
                             pn.addId(idd);
                         }
 

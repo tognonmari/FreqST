@@ -30,7 +30,9 @@ class LowDimensionalGrid{
 
                     if(this->discrete_cell_coordinates[i]<other.discrete_cell_coordinates[i])
                         return true;
-
+                    if(this->discrete_cell_coordinates[i]> other.discrete_cell_coordinates[i]){
+                        return false;
+                    }
                 }
                 return false;
             }
@@ -76,8 +78,8 @@ class LowDimensionalGrid{
 
             //Identify which cells I need to visit
             auto bounds = query_cell_delimiters(point, search_distance_unsquared);
-            std::cout << "CELL BOUNDS "<< bounds.first.to_string()<< " AND "<< bounds.second.to_string()<<std::endl;
-            std::cout << "I survived the printing" << std::endl;
+            //std::cout << "CELL BOUNDS "<< bounds.first.to_string()<< " AND "<< bounds.second.to_string()<<std::endl;
+            
             //Iterate over the visting cells 
             result_t intersecting_cells_points;
             //Define a lambda to pass this as argument
@@ -128,24 +130,24 @@ class LowDimensionalGrid{
             //Assert the cell is not empty (i.e. assert it exists in the map)
             auto iter = grid.find(cell);
             if (iter==grid.end()){
-                std::cout << "Cell "<< cell.to_string()<<" is empty"<< std::endl;
+                //std::cout << "Cell "<< cell.to_string()<<" is empty"<< std::endl;
                 return;
             }
-            std::cout << "The cell "<<cell.to_string()<<" is not empty and i am indeed adding the points to the output"<< std::endl;
-            output.insert(output.end(),grid[cell].begin(), grid[cell].end());
-            return;
-            /*
+            //std::cout << "The cell "<<cell.to_string()<<" is not empty and i am indeed adding the points to the output"<< std::endl;
+            
             //Assert some intersection exists: get cell vertices' list and check whether any of them is below the radius threshold
-            for (point_t vertex : compute_cell_vertices<dimension>(cell)){
+            for (point_t vertex : get_cell_vertices(cell)){
                 //If some intersection is possible, append the cell content to the output.
                 //Also, I add some fuzzyness for corner cases: better safe than sorry
-                if (distance_fuction_t{}(vertex, center)<= radius*radius* 1.001){
-                    std::cout << "The cell "<<cell.to_string()<<" is not empty and i am indeed adding the points to the output"<< std::endl;
+                if (distance_function_t{}(vertex, center)<= radius*radius* 1.00001){
+                    //std::cout << "The cell "<<cell.to_string()<<" is not empty and i am indeed adding the points to the output"<< std::endl;
                     output.insert(output.end(),grid[cell].begin(), grid[cell].end());
                     return;
                 }
+
             }
-            */
+            //std::cout << "Cell "<< cell.to_string() <<" doesn't intersect the range."<<std::endl;
+            
         }
         //Dimension sensitive loop unfolding
         template<std::size_t dim, typename query_func>
@@ -163,6 +165,49 @@ class LowDimensionalGrid{
 
         }
 
+        
+        std::vector<point_t>  get_cell_vertices(CellKey<dimension>& cell_id){
+
+            point_t lower_left = get_cell_lower_left_vertex(cell_id);
+            std::size_t num_vertices = 1<< dimension; //2^dimension
+            std::vector<point_t> vertices;
+            
+
+
+            for (std::size_t mask =0; mask<num_vertices; ++mask) {
+
+                std::array<double, dimension> coordinates;
+
+                for (std::size_t d=0; d<dimension; d++) {
+
+                    double offset = (mask & (1 <<d)) ? grid_side : 0.0;
+                    
+                    coordinates[d] = offset;
+
+                }
+                if constexpr( dimension ==2 ){
+                    point_t p(coordinates[0]+ lower_left.x(), coordinates[1]+ lower_left.y());
+                    vertices.push_back(p);
+
+                }
+                else if constexpr( dimension== 3){
+                    point_t p(coordinates[0]+ lower_left.x(), coordinates[1]+ lower_left.y(), coordinates[2]+ lower_left.z());
+                    vertices.push_back(p);
+
+
+                }
+                
+            }
+            /*
+            
+            std::cout << "Here are the Vertices of cell"<< cell_id.to_string()<< std::endl;
+            for (auto vertex : vertices){
+                std::cout <<print_point(vertex) <<std::endl;
+            }
+            */
+            return vertices;
+
+        }
         //Identifies where the point is stored
         CellKey<dimension> compute_cell_key(const point_t& point){
 
@@ -177,6 +222,7 @@ class LowDimensionalGrid{
             return key;
 
         }
+
         point_t get_cell_lower_left_vertex(CellKey<dimension>& cell_id){
 
             point_t vertex = origin_point;
@@ -219,7 +265,7 @@ class LowDimensionalGrid{
                 bounds.second.discrete_cell_coordinates[i] = ball_center_cell.discrete_cell_coordinates[i] + offset_cell_coord;
                 
             }
-            std::cout << "The minimum cell is "<< bounds.first.to_string()<< ", The second is "<< bounds.second.to_string()<< std::endl;
+            //std::cout << "The minimum cell is "<< bounds.first.to_string()<< ", The second is "<< bounds.second.to_string()<< std::endl;
             return bounds;
 
         }

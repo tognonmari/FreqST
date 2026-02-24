@@ -102,13 +102,17 @@ int main(int argc, char** argv){
             break;
         }
         case sampling_mode::rough_vc:{
+            auto start = chrono::high_resolution_clock::now();
             sampler.generate_rough_vc_sample();
+            auto end = chrono::high_resolution_clock::now();
+            auto duration = duration_cast<chrono::milliseconds>(end - start);
+            std::cout << "TIME: "<<duration.count() << std::endl;
             sampler.dump_sample_to_file(std::format("{}/roughvc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
             break;
         }
-    }
+    } 
 
-    //std::cout << "your seed is : " << seed <<std::endl;
+    //std::cout << "your seed  is : " << seed <<std::endl;
     
     
     //freq_subtrajectory_sampler<space> sampler(dataset, epsilon, delta, radius, minimum_length, seed );
