@@ -48,7 +48,7 @@ class freq_subtrajectory_sampler{
         freq_subtrajectory_sampler(const trajectory_t& trajectory,
             float eps, 
             float del, 
-            distance_t radius, int minimum_length, int random_seed) : the_trajectory(trajectory), epsilon(eps), delta(del), distance_threshold(radius), min_length(minimum_length), seed(random_seed){
+            distance_t radius, int minimum_length, int random_seed, double grid_side_factor) : the_trajectory(trajectory), epsilon(eps), delta(del), distance_threshold(radius), min_length(minimum_length), seed(random_seed), grid_side_factor(grid_side_factor){
 
                 std::mt19937 seeded_generator(seed);
                 this->mt = seeded_generator;
@@ -147,9 +147,89 @@ class freq_subtrajectory_sampler{
             this->sample_trajectories(size);
         }
 
+        void generate_rough_vc_no_erase_sample(){
+
+            //Step 1: compute sample size according to rule. 
+            (this->sampled_trajs_ids).clear();
+
+            int sample_size = (int) (2 / (epsilon * epsilon)) * (this->rough_vc_dim_no_erase() + log(2 / delta));
+            std::cout << " Rough VCdim sample size with espilon "<<epsilon << ",  delta "<< delta <<", radius "<< distance_threshold<< " is: "<< sample_size <<std::endl;
+            //Step 2: assert sampling is worthwhile
+            if(sample_size > the_trajectory.num_trajectories()){
+
+                std::cerr << "VC Bound was too loose for your dataset."<< std::endl;
+
+                std::exit(1);
+
+            }
+            //Step 3: Sample indexes with replacement
+            this->sample_trajectories(sample_size);
+
+        }
     private:
+        int rough_vc_dim_no_erase(){
+        range_search_t search{the_trajectory, grid_side_factor*distance_threshold};
+        std::vector<int> c;
+        index_t last_seen_trajectory = the_trajectory.get_id_at(0);
+        int counter=0;
+        int total_distances = 0;
+        float squared_distance_threshold = distance_threshold*distance_threshold;
+        for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
+            if(i%10000 == 0){
+                
+            std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+
+            }
+            if(the_trajectory.get_id_at(i) == last_seen_trajectory){
+                
+                
+                int ss = search.search_no_erase(i, this->distance_threshold*distance_threshold).size();
+                counter +=ss;
+
+            }
+            else{
+
+                // Append the result up to now to c
+                c.push_back(floor(log2(counter*(1.0-(1/counter))) + 1));
+                //initialize the set again 
+                counter = 0;
+                last_seen_trajectory = the_trajectory.get_id_at(i);
+                int ss = search.search(i, this->distance_threshold*distance_threshold).size();
+                counter += ss;
+                //add info for the current point
+
+
+            }
+
+        }  
+        //std::cout<<total_distances << std::endl;
+        std::sort(c.begin(),c.end(), std::greater<>());
+        //std::cout <<"############ Details: #################\n";
+        /*
+        for (int i=0; i<c.size();i++){
+
+            std::cout<< " H index vector at position "<< i<< " "<< c.at(i)<<std::endl;
+
+        }
+        */
+
+        int vc_dim = 0;
+        
+        for(int i = 0 ; i < c.size(); i++){
+
+            if(vc_dim < c.at(i)){
+
+                vc_dim++;
+
+            }
+
+        }
+        std::cout <<"VC DIM ESTIMATE IS "<< vc_dim <<"\n";
+        return vc_dim;
+
+    }
     int rough_vc_dim(){
-        range_search_t search{the_trajectory,0.2*distance_threshold};
+        range_search_t search{the_trajectory, grid_side_factor*distance_threshold};
         std::vector<int> c;
         index_t last_seen_trajectory = the_trajectory.get_id_at(0);
         int counter=0;
@@ -446,6 +526,7 @@ class freq_subtrajectory_sampler{
     int min_length;
     bool performed_sampling;
     int seed;
+    float grid_side_factor;
     
 };
 

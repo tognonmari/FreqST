@@ -60,16 +60,29 @@ class grid_range_search{
         result_t search(index_t index, distance_t squared_distance){
             
             auto search_distance_unsquared = std::sqrt(squared_distance);
-            result_t points_in_hypercube;
+            std::array<result_t, 2> points_in_hypercube;
             //retrieve cell content
             points_in_hypercube = grid.search(point_map[index],search_distance_unsquared);
             //delete points out of range
-            erase_points_out_of_range(points_in_hypercube, index, squared_distance);
-            return points_in_hypercube;
+            erase_points_out_of_range(points_in_hypercube[1], index, squared_distance);
+            points_in_hypercube[0].insert(points_in_hypercube[0].end(), points_in_hypercube[1].begin(), points_in_hypercube[1].end());
+            return points_in_hypercube[0];
             
 
         }
+        result_t search_no_erase(index_t index, distance_t squared_distance){
+            
+            auto search_distance_unsquared = std::sqrt(squared_distance);
+            std::array<result_t, 2> points_in_hypercube;
+            //retrieve cell content
+            points_in_hypercube = grid.search(point_map[index],search_distance_unsquared);
+            //DO NOT delete points out of range
+            //erase_points_out_of_range(points_in_hypercube[1], index, squared_distance);
+            points_in_hypercube[0].insert(points_in_hypercube[0].end(), points_in_hypercube[1].begin(), points_in_hypercube[1].end());
+            return points_in_hypercube[0];
+            
 
+        }
         grid_t& get_grid() {
 
             return this-> grid;
