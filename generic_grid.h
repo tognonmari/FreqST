@@ -74,7 +74,7 @@ class LowDimensionalGrid{
 
         }
 
-        result_t search(point_t point, distance_t search_distance_unsquared){
+        std::array<result_t,2> search(point_t point, distance_t search_distance_unsquared){
 
             //Identify which cells I need to visit
             auto bounds = query_cell_delimiters(point, search_distance_unsquared);
