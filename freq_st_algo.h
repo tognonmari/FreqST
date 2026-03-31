@@ -42,7 +42,7 @@ class freq_subtrajectory_sampler{
     using range_search_t = grid_range_search<space>;
     using subtrajectory_t = trajectory_t::subtrajectory_t;
     using id_t = trajectory_t::id_t;
-
+    
     
     public:
         freq_subtrajectory_sampler(const trajectory_t& trajectory,
@@ -53,7 +53,56 @@ class freq_subtrajectory_sampler{
                 std::mt19937 seeded_generator(seed);
                 this->mt = seeded_generator;
             }
+        void fill_beginnings_of_pathlet_vector(){
 
+            //Given the dataset (this->the_trajectory;) and the min_legth, 
+            //we detect the beginning points of the long pathelets and insert them in the beggining vectors.
+            //These beginnings will be used to instantiate the grid in the vc dimension
+            id_t last_trajectory = the_trajectory.get_id_at(the_trajectory.get_actual_size()-1);
+            id_t current_visiting_id = the_trajectory.get_id_at(0);
+            //Step one iterate through whole dataset and build a pathlet tree
+            bool last_iter = false;
+            while(true){
+                
+                if(current_visiting_id ==last_trajectory){
+                    last_iter = true;
+                }
+                trajectory_t pathlet_mother = the_trajectory.slice_trajectory_by_id(current_visiting_id);
+                BinaryPathletTree pathlet_tree(pathlet_mother, current_visiting_id, floor(log2(pathlet_mother.total_size())) + 1,1);
+                //For debugging purposes: print the tree
+                //std::cout<< "Pathelet tree for tid "<< current_visiting_id<< std::endl;
+                //std::cout << pathlet_tree.toString()<< std::endl;
+                
+                std::vector<PathletNode<space>> min_length_pathlets = pathlet_tree.getMinLengthPathlets(this-> min_length);
+
+                index_t trajectory_offset = the_trajectory.get_first_point_in_trajectory(current_visiting_id);
+                for (auto& pathlet_node: min_length_pathlets){
+
+                    index_t left_extreme = pathlet_node.pathlet.first;
+                    
+                    this->pathlet_beginnings.insert({left_extreme + trajectory_offset, the_trajectory[left_extreme + trajectory_offset]});
+                }
+
+                //Move on to the next trajectory
+                if(last_iter){
+                    break;
+                }
+
+                current_visiting_id = the_trajectory.get_id_at(trajectory_offset + pathlet_mother.get_actual_size());
+
+            }
+            //For each pathlet tree, go down from the root and if there's a node @ that level of length >= min_length add it.
+            //Stop when along the level all pathelts are shorter. 
+             
+            //For debugging purposes: print the pathlet beginnings 
+            //std::cout << "The pathlet beginnings are : "<< std::endl;
+            //for (const auto& pt : this->pathlet_beginnings){
+            //    std::cout<< pt.first <<"\n";
+            //}
+
+
+
+        }
         void generate_chernoff_sample(){
 
             //Step 1: compute sample size according to Chernoff rule. 
@@ -166,201 +215,231 @@ class freq_subtrajectory_sampler{
             this->sample_trajectories(sample_size);
 
         }
+        //For debuggining
+        std::map<index_t, point_t> get_pathlet_beginnings(){
+
+            return this->pathlet_beginnings;
+        }
+    
     private:
+
+
         int rough_vc_dim_no_erase(){
-        range_search_t search{the_trajectory, grid_side_factor*distance_threshold};
-        std::vector<int> c;
-        index_t last_seen_trajectory = the_trajectory.get_id_at(0);
-        int counter=0;
-        int total_distances = 0;
-        float squared_distance_threshold = distance_threshold*distance_threshold;
-        for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-            if(i%10000 == 0){
-                
-            std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
 
+            range_search_t search{the_trajectory[0], grid_side_factor*distance_threshold};
+
+            for (const auto& pair : this->pathlet_beginnings){
+
+                search.insert(pair.first, pair.second);
             }
-            if(the_trajectory.get_id_at(i) == last_seen_trajectory){
-                
-                
-                int ss = search.search_no_erase(i, this->distance_threshold*distance_threshold).size();
-                counter +=ss;
-
-            }
-            else{
-
-                // Append the result up to now to c
-                c.push_back(floor(log2(counter*(1.0-(1/counter))) + 1));
-                //initialize the set again 
-                counter = 0;
-                last_seen_trajectory = the_trajectory.get_id_at(i);
-                int ss = search.search(i, this->distance_threshold*distance_threshold).size();
-                counter += ss;
-                //add info for the current point
-
-
-            }
-
-        }  
-        //std::cout<<total_distances << std::endl;
-        std::sort(c.begin(),c.end(), std::greater<>());
-        //std::cout <<"############ Details: #################\n";
-        /*
-        for (int i=0; i<c.size();i++){
-
-            std::cout<< " H index vector at position "<< i<< " "<< c.at(i)<<std::endl;
-
-        }
-        */
-
-        int vc_dim = 0;
         
-        for(int i = 0 ; i < c.size(); i++){
-
-            if(vc_dim < c.at(i)){
-
-                vc_dim++;
-
-            }
-
-        }
-        std::cout <<"VC DIM ESTIMATE IS "<< vc_dim <<"\n";
-        return vc_dim;
-
-    }
-    int rough_vc_dim(){
-        range_search_t search{the_trajectory, grid_side_factor*distance_threshold};
-        std::vector<int> c;
-        index_t last_seen_trajectory = the_trajectory.get_id_at(0);
-        int counter=0;
-        int total_distances = 0;
-        float squared_distance_threshold = distance_threshold*distance_threshold;
-        for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-            if(i%10000 == 0){
-                
-            std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
-
-            }
-            if(the_trajectory.get_id_at(i) == last_seen_trajectory){
-                
-                
-                int ss = search.search(i, this->distance_threshold*distance_threshold).size();
-                counter +=ss;
-
-            }
-            else{
-
-                // Append the result up to now to c
-                c.push_back(floor(log2(counter*(1.0-(1/counter))) + 1));
-                //initialize the set again 
-                counter = 0;
-                last_seen_trajectory = the_trajectory.get_id_at(i);
-                int ss = search.search(i, this->distance_threshold*distance_threshold).size();
-                counter += ss;
-                //add info for the current point
-
-
-            }
-
-        }  
-        //std::cout<<total_distances << std::endl;
-        std::sort(c.begin(),c.end(), std::greater<>());
-        //std::cout <<"############ Details: #################\n";
-        /*
-        for (int i=0; i<c.size();i++){
-
-            std::cout<< " H index vector at position "<< i<< " "<< c.at(i)<<std::endl;
-
-        }
-        */
-
-        int vc_dim = 0;
         
-        for(int i = 0 ; i < c.size(); i++){
+            std::vector<int> c;
+            index_t last_seen_trajectory = the_trajectory.get_id_at(0);
+            int counter=0;
+            int total_distances = 0;
+            float squared_distance_threshold = distance_threshold*distance_threshold;
+            for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
+                if(i%10000 == 0){
+                    
+                std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
 
-            if(vc_dim < c.at(i)){
+                }
+                if(the_trajectory.get_id_at(i) == last_seen_trajectory){
+                    
+                    
+                    int ss = search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold).size();
+                    counter +=ss;
 
-                vc_dim++;
+                }
+                else{
+
+                    // Append the result up to now to c
+                    c.push_back(floor(log2(counter*(1.0-(1/counter))) + 1));
+                    //initialize the set again 
+                    counter = 0;
+                    last_seen_trajectory = the_trajectory.get_id_at(i);
+                    int ss = search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold).size();
+                    counter += ss;
+                    //add info for the current point
+
+
+                }
+
+            }  
+            //std::cout<<total_distances << std::endl;
+            std::sort(c.begin(),c.end(), std::greater<>());
+            //std::cout <<"############ Details: #################\n";
+            /*
+            for (int i=0; i<c.size();i++){
+
+                std::cout<< " H index vector at position "<< i<< " "<< c.at(i)<<std::endl;
 
             }
+            */
+
+            int vc_dim = 0;
+            
+            for(int i = 0 ; i < c.size(); i++){
+
+                if(vc_dim < c.at(i)){
+
+                    vc_dim++;
+
+                }
+
+            }
+            std::cout <<"VC DIM ESTIMATE IS "<< vc_dim <<"\n";
+            return vc_dim;
 
         }
-        std::cout <<"VC DIM ESTIMATE IS "<< vc_dim <<"\n";
-        return vc_dim;
 
-    }
+        int rough_vc_dim(){
+            range_search_t search{the_trajectory[0], grid_side_factor*distance_threshold};
 
-    int vc_dim(){
+            for (const auto& pair : this->pathlet_beginnings){
 
-        //Compute VC Dimension 
-        range_search_t search{the_trajectory,0.2*distance_threshold};
-        std::vector<int> c;
-        index_t last_seen_trajectory = the_trajectory.get_id_at(0);
-        std::set<index_t> traj_set;
-        float squared_distance_threshold = distance_threshold *distance_threshold;
-        for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-            if(i%10000 == 0){
-                
-            std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+                search.insert(pair.first, pair.second);
+            }
+        
+        
+            std::vector<int> c;
+            index_t last_seen_trajectory = the_trajectory.get_id_at(0);
+            int counter=0;
+            int total_distances = 0;
+            float squared_distance_threshold = distance_threshold*distance_threshold;
+            for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
+                if(i%10000 == 0){
+                    
+                std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+
+                }
+                if(the_trajectory.get_id_at(i) == last_seen_trajectory){
+                    
+                    
+                    int ss = search.search(the_trajectory[i], this->distance_threshold*distance_threshold).size();
+                    counter +=ss;
+
+                }
+                else{
+
+                    // Append the result up to now to c
+                    c.push_back(floor(log2(counter*(1.0-(1/counter))) + 1));
+                    //initialize the set again 
+                    counter = 0;
+                    last_seen_trajectory = the_trajectory.get_id_at(i);
+                    int ss = search.search(the_trajectory[i], this->distance_threshold*distance_threshold).size();
+                    counter += ss;
+                    //add info for the current point
+
+
+                }
+
+            }  
+            //std::cout<<total_distances << std::endl;
+            std::sort(c.begin(),c.end(), std::greater<>());
+            //std::cout <<"############ Details: #################\n";
+            /*
+            for (int i=0; i<c.size();i++){
+
+                std::cout<< " H index vector at position "<< i<< " "<< c.at(i)<<std::endl;
 
             }
-            if(the_trajectory.get_id_at(i) == last_seen_trajectory){
+            */
 
-                point_t point = the_trajectory[i];
-                /*
-                for (int jj=0; jj<the_trajectory.total_size(); jj++){
+            int vc_dim = 0;
+            
+            for(int i = 0 ; i < c.size(); i++){
 
-                    if(auto d_ij = distance_function_t{}(the_trajectory[jj], point)< squared_distance_threshold){
-                        //counter +=1;
-                        traj_set.insert((index_t)jj);
+                if(vc_dim < c.at(i)){
+
+                    vc_dim++;
+
+                }
+
+            }
+            std::cout <<"VC DIM ESTIMATE IS "<< vc_dim <<"\n";
+            return vc_dim;
+
+        }
+
+        int vc_dim(){
+
+            //Compute VC Dimension 
+            range_search_t search{the_trajectory[0], grid_side_factor*distance_threshold};
+        
+
+            for (const auto& pair : this->pathlet_beginnings){
+
+                search.insert(pair.first, pair.second);
+            }
+            
+            assert(search.num_elements() == this->pathlet_beginnings.size());
+            
+            std::vector<int> c;
+            index_t last_seen_trajectory = the_trajectory.get_id_at(0);
+            std::set<index_t> traj_set;
+            float squared_distance_threshold = distance_threshold *distance_threshold;
+            for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
+                if(i%10000 == 0){
+                    
+                std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+
+                }
+                if(the_trajectory.get_id_at(i) == last_seen_trajectory){
+
+                    point_t point = the_trajectory[i];
+                    /*
+                    for (int jj=0; jj<the_trajectory.total_size(); jj++){
+
+                        if(auto d_ij = distance_function_t{}(the_trajectory[jj], point)< squared_distance_threshold){
+                            //counter +=1;
+                            traj_set.insert((sindex_t)jj);
+                        }
+
+                    }
+                    */
+
+                    for (const auto idx: search.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+
+                        traj_set.insert(idx);
+
+                    }
+                }
+                else{
+                    
+                    // Append the result up to now to c
+                    c.push_back(floor(log2(traj_set.size()) + 1));
+                    //initialize the set again 
+                    traj_set.clear();
+                    last_seen_trajectory = the_trajectory.get_id_at(i);
+                    //add info for the current point
+                    for (const auto idx: search.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+
+                        traj_set.insert(idx);
+
                     }
 
-                }
-                */
-
-                for (const auto idx: search.search(i, this->distance_threshold*distance_threshold)) {
-
-                    traj_set.insert(idx);
 
                 }
-                
-                
-            }
-            else{
-                
-                // Append the result up to now to c
-                c.push_back(floor(log2(traj_set.size()) + 1));
-                //initialize the set again 
-                
-                traj_set.clear();
-                last_seen_trajectory = the_trajectory.get_id_at(i);
-                //add info for the current point
-                for (const auto idx: search.search(i, this->distance_threshold*distance_threshold)) {
-
-                    traj_set.insert(idx);
-
-                }
-
 
             }
+            std::sort(c.begin(),c.end(), std::greater<>());
+            
+            int vc_dim = 0;
+            
+            for(int i = 0 ; i < c.size(); i++){
 
+                if(vc_dim < c.at(i)){
+
+                    vc_dim++;
+
+                }
+
+            }
+            std::cout <<"VC DIM ESTIMATE IS "<< vc_dim <<"\n";
+            return vc_dim;
         }
-        std::sort(c.begin(),c.end(), std::greater<>());
-        
-        int vc_dim = 0;
-        
-        for(int i = 0 ; i < c.size(); i++){
-
-            if(vc_dim < c.at(i)){
-
-                vc_dim++;
-
-            }
-
-        }
-        std::cout <<"VC DIM ESTIMATE IS "<< vc_dim <<"\n";
-        return vc_dim;
-    }
     
     /*
     int aggressive_vc_dim(){
@@ -445,7 +524,7 @@ class freq_subtrajectory_sampler{
     }
     */
     
-    void print_subtrajectory_to_file(std::ofstream& fout, id_t& id){
+        void print_subtrajectory_to_file(std::ofstream& fout, id_t& id){
 
         size_t n = the_trajectory.num_trajectories();
         index_t j = the_trajectory.get_first_point_in_trajectory(id%n);
@@ -461,7 +540,7 @@ class freq_subtrajectory_sampler{
         return;
     }
 
-    int total_pathlet_number_respecting_ids(){
+        int total_pathlet_number_respecting_ids(){
         int total = 0;
 
         for (id_t i = 0; i < the_trajectory.num_trajectories(); i ++){
@@ -474,7 +553,7 @@ class freq_subtrajectory_sampler{
 
     }
     
-    void sample_trajectories(int sample_size){
+        void sample_trajectories(int sample_size){
 
         if(! sampled_trajs_ids.empty()){
 
@@ -522,7 +601,9 @@ class freq_subtrajectory_sampler{
         return;
     }
 
+
     std::mt19937 mt;
+    std::map<index_t, point_t> pathlet_beginnings;
     std::vector<id_t> sampled_trajs_ids;
     trajectory_t the_trajectory;
     distance_t distance_threshold;

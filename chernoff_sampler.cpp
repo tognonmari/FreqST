@@ -19,7 +19,7 @@ using namespace frechet;
 namespace chrono = std::chrono;
 using space = CGAL_metric_space<CGAL::Simple_cartesian<double>, CGAL::Dimension_tag<2>>;
 
-
+using point_t = space::point_t;
 using free_space_graph_t =  free_space_graph_free_axis<space>;
 using frequent_subtrajectory_algo_t = frequent_subtrajectory_algo<space>;
 using trajectory_t = trajectory_collection<space>;
@@ -27,7 +27,7 @@ using validation_t = validation<space>;
 using index_t = trajectory_t::index_t;
 using distance_function_t = space::distance_function_t;
 using distance_t = distance_function_t::distance_t;
-using range_search_t = kd_tree_range_search<space>;
+using range_search_t = grid_range_search<space>;
 namespace chrono = std::chrono;
 enum class sampling_mode {
     fixed_size = 0,
@@ -47,7 +47,7 @@ int main(int argc, char** argv){
 
     int minimum_length = 1;
     int seed = 0;
-    distance_t radius;
+    distance_t radius = 50.0;
     std::string infilename, outfiledir;
     sampling_mode mode;
     double grid_side_wrt_radius = 0.2;
@@ -77,6 +77,10 @@ int main(int argc, char** argv){
                    outfiledir,   
                    "The directory where the sample will be dumped.")
         ->required();
+    app.add_option("-l, --min_length",
+                    minimum_length,
+                    "The minimum length of the pathlets to be kept.")
+                    ->default_val(1);
     app.add_option("-m, --mode",
                    mode,
                    "Sampling mode: 0 for Fixed Size, 1 for Chernoff, 2 for VC, 3 for Rough VC Estimate.")
@@ -88,15 +92,18 @@ int main(int argc, char** argv){
 
     trajectory_t dataset = read_trajectory_from_file<space>(infilename);
     freq_subtrajectory_sampler<space> sampler(dataset, epsilon, delta, radius, minimum_length, seed, grid_side_wrt_radius);
+
+    sampler.fill_beginnings_of_pathlet_vector();
+
     switch(mode){
         case sampling_mode::fixed_size:{
             sampler.generate_fixed_size_sample(fixed_size);
-            sampler.dump_sample_to_file(std::format("{}/fixedsize_{}_{}.txt", outfiledir, fixed_size, seed));
+            //sampler.dump_sample_to_file(std::format("{}/fixedsize_{}_{}.txt", outfiledir, fixed_size, seed));
             break;
         }
         case sampling_mode::chernoff:{
             sampler.generate_chernoff_sample();
-            sampler.dump_sample_to_file(std::format("{}/chernoff_{}_{}_{}.txt", outfiledir, epsilon, delta, seed));
+            //sampler.dump_sample_to_file(std::format("{}/chernoff_{}_{}_{}.txt", outfiledir, epsilon, delta, seed));
             break;
         }
         case sampling_mode::vc:{

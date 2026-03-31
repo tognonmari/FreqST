@@ -42,7 +42,8 @@ class grid_range_search{
         using search_traits = CGAL::Search_traits_adapter<typename property_map_t::key_type, property_map_t, search_trait_base>;
         using grid_range_t = std::vector<index_t>; 
         using grid_t = LowDimensionalGrid<space, index_t>;
-        
+        using point_id_t = grid_t::point_id_t;
+        using manual_map_t = std::map<point_id_t, point_t>; // I need this map to be able to erase pts out of range
     public:
         
         using result_t = std::vector<typename property_map_t::key_type>;
@@ -51,31 +52,48 @@ class grid_range_search{
                                                                             grid(grid_side, trajectory[0]) {
             for (index_t i =0; i< trajectory.total_size(); i++){
 
-                grid.insert(i, point_map[i]);
+                grid.insert(i, trajectory[i]);
 
             } 
 
         }
 
-        result_t search(index_t index, distance_t squared_distance){
+        grid_range_search(const point_t center_point, distance_t grid_side) : point_map(manual_map_t{}),grid(grid_side, center_point){
+
+            manual_map_t new_map; // I need this map to be able to erase pts out of range 
+            point_map = new_map;
+
+        }
+
+        void insert(point_id_t id, point_t point){
+            auto* map_ptr = std::get_if<manual_map_t>(&point_map);
+            if (map_ptr == nullptr){
+                return; //Cannot insert using the manula map 
+            }
+            map_ptr ->insert({id, point});
+            grid.insert(id, point);
+
+        }
+
+        result_t search(point_t point, distance_t squared_distance){
             
             auto search_distance_unsquared = std::sqrt(squared_distance);
             std::array<result_t, 2> points_in_hypercube;
             //retrieve cell content
-            points_in_hypercube = grid.search(point_map[index],search_distance_unsquared);
+            points_in_hypercube = grid.search(point,search_distance_unsquared);
             //delete points out of range
-            erase_points_out_of_range(points_in_hypercube[1], index, squared_distance);
+            erase_points_out_of_range(points_in_hypercube[1], point, squared_distance);
             points_in_hypercube[0].insert(points_in_hypercube[0].end(), points_in_hypercube[1].begin(), points_in_hypercube[1].end());
             return points_in_hypercube[0];
             
 
         }
-        result_t search_no_erase(index_t index, distance_t squared_distance){
+        result_t search_no_erase(point_t point, distance_t squared_distance){
             
             auto search_distance_unsquared = std::sqrt(squared_distance);
             std::array<result_t, 2> points_in_hypercube;
             //retrieve cell content
-            points_in_hypercube = grid.search(point_map[index],search_distance_unsquared);
+            points_in_hypercube = grid.search(point,search_distance_unsquared);
             //DO NOT delete points out of range
             //erase_points_out_of_range(points_in_hypercube[1], index, squared_distance);
             points_in_hypercube[0].insert(points_in_hypercube[0].end(), points_in_hypercube[1].begin(), points_in_hypercube[1].end());
@@ -83,20 +101,37 @@ class grid_range_search{
             
 
         }
+        
         grid_t& get_grid() {
 
             return this-> grid;
         }
 
-        
+        std::size_t num_elements(){
+            auto* map_ptr = std::get_if<manual_map_t>(&point_map);
+            if(map_ptr != nullptr){
+                return map_ptr->size();
+            }
+            else{
+                return std::get<property_map_t>(point_map).size();
+                
+            }
+        }
 
     private:
-        const property_map_t point_map; //reference to the original trajectory
+        std::variant<manual_map_t, property_map_t> point_map; //reference to the original trajectory
         grid_t grid;
+        //Retrieve point either from map or adapter
+        point_t get_point(point_id_t id){
+
+            return std::visit([id](auto& m) { return m[id]; }, point_map);
+
+        }
+
         //Search results clean up
-        void erase_points_out_of_range(result_t &points, index_t index, distance_t distance) {
-            std::erase_if(points, [this, index, distance](const index_t p) {
-                return distance_function_t()(point_map[p], point_map[index]) > distance;
+        void erase_points_out_of_range(result_t &points, point_t center, distance_t distance) {
+            std::erase_if(points, [this, center, distance](const index_t p) {
+                return distance_function_t()(get_point(p), center) > distance;
             });
         }
 

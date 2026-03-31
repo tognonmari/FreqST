@@ -62,7 +62,16 @@ class RangeBitset{
             return s;
 
         }
+        std::string to_string_readable() const{
+            std::string s  = "";
+            for (int pos = this->range.find_first(); pos != this->range.npos; pos= this->range.find_next(pos)){
 
+                s+= std::format("{} ", pos);
+
+            }
+            return s;
+
+        }
 
     private:
         boost::dynamic_bitset<> range;
@@ -107,6 +116,21 @@ class vc_dim_extractor{
                     set_of_supports.insert(rb);
 
                 }
+                std::cout << "SUPPORTS "<< std::endl;
+                int current_visiting_size = 1;
+                
+                for (auto&s : set_of_supports){
+                    if (current_visiting_size != s.count()){
+                        std::cout<< "SIZE "<< s.count()<<std::endl;
+                        current_visiting_size = s.count();
+                    }
+
+                    std::cout << s.to_string_readable() <<std::endl;
+
+                }
+                
+            
+                
                 steps.converted_supports_to_bitsets = true;
             }
 
@@ -127,6 +151,7 @@ class vc_dim_extractor{
             }
 
             int current_visiting_size =2;
+            int largest_size_shattered = 1;
             bool found_shattered = false;
             for (const auto& s : set_of_supports){
 
@@ -152,10 +177,14 @@ class vc_dim_extractor{
                 if (s_shattered){
                     found_shattered = true;
                     shattered_subsets.insert(s);
+                    if (s.count() >=2){
+                        std::cout << "Shattered set "<<s.to_string_readable() << std::endl;
+                    }
+                    largest_size_shattered = s.count();
                 }
             }
 
-            return current_visiting_size-1;
+            return largest_size_shattered;
         }
             
         
