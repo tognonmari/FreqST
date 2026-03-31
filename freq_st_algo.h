@@ -509,10 +509,10 @@ class frequent_subtrajectory_algo{
             this->sample = sampled_traj; //I keep the original sample, I will build the simplification later in the constructor
             this->dataset_location = dataset_file;
             this->output_config = configs;
-            std::cout << sampled_traj.num_trajectories_not_consecutive()<< std::endl;
-            std::cout<<"Frequency threshold is "<< frequency_threshold << std::endl;
+            //std::cout << sampled_traj.num_trajectories_not_consecutive()<< std::endl;
+            //std::cout<<"Frequency threshold is "<< frequency_threshold << std::endl;
             this->integer_frequency_threshold = ceil(frequency_threshold *((int)sampled_traj.num_trajectories_not_consecutive()));
-            std::cout << "THE INTEGER FREQ THRESHOLD IS "<< this->integer_frequency_threshold<<std::endl;
+            //std::cout << "THE INTEGER FREQ THRESHOLD IS "<< this->integer_frequency_threshold<<std::endl;
             this-> last_parsed_trajectory = -1;
             this-> distance_threshold = distance_thresh;
             for (int i=0; i<25; i++){
