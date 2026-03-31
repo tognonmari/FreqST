@@ -10,16 +10,7 @@ class LowDimensionalGrid{
 
     public: //exposed types
         using result_t = std::vector<point_identifier_t>;
-    private:
-        using kernel = space::kernel;
-        using point_t = space::point_t;
-        using distance_function_t = space::distance_function_t;
-        using distance_t = space::distance_function_t::distance_t;
-        using cell_content_t =std::vector<point_identifier_t>;
-        static constexpr std::size_t dimension = space::dimension::value;
-        using vector_t = std::conditional_t<(dimension==2), typename kernel::Vector_2, std::conditional_t<(dimension==3), typename kernel::Vector_3, void>>;
-
-
+        using point_id_t = point_identifier_t;
         template<std::size_t D>
         struct CellKey{ 
             
@@ -60,6 +51,17 @@ class LowDimensionalGrid{
 
             
         };
+    private:
+        using kernel = space::kernel;
+        using point_t = space::point_t;
+        using distance_function_t = space::distance_function_t;
+        using distance_t = space::distance_function_t::distance_t;
+        using cell_content_t =std::vector<point_identifier_t>;
+        static constexpr std::size_t dimension = space::dimension::value;
+        using vector_t = std::conditional_t<(dimension==2), typename kernel::Vector_2, std::conditional_t<(dimension==3), typename kernel::Vector_3, void>>;
+
+
+        
     public: 
         LowDimensionalGrid(distance_t grid_side, const point_t origin_point) : grid_side(grid_side), origin_point(origin_point) {
 
@@ -74,16 +76,16 @@ class LowDimensionalGrid{
 
         }
 
-        result_t search(point_t point, distance_t search_distance_unsquared){
+        std::array<result_t,2> search(point_t point, distance_t search_distance_unsquared){
 
             //Identify which cells I need to visit
             auto bounds = query_cell_delimiters(point, search_distance_unsquared);
             //std::cout << "CELL BOUNDS "<< bounds.first.to_string()<< " AND "<< bounds.second.to_string()<<std::endl;
             
             //Iterate over the visting cells 
-            result_t intersecting_cells_points;
+            std::array<result_t, 2> intersecting_cells_points;
             //Define a lambda to pass this as argument
-            auto query_cell_func = [this](CellKey<dimension>& cell, result_t& output,point_t& point,distance_t dist){
+            auto query_cell_func = [this](CellKey<dimension>& cell, std::array<result_t,2>& output,point_t& point,distance_t dist){
                 this->query_cell(cell, point, dist, output);
             };
             this->get_points_in_ball_intersecting_cells<dimension>(bounds.first, bounds.second, bounds.first, query_cell_func, intersecting_cells_points, point, search_distance_unsquared, 0);
@@ -126,7 +128,7 @@ class LowDimensionalGrid{
         const double grid_side;
 
         //Verify whether the cell can have any intersection with the ball, then add points if some intersection exists
-        void query_cell(CellKey<dimension>& cell, point_t& center, distance_t radius, result_t& output){
+        void query_cell(CellKey<dimension>& cell, point_t& center, distance_t radius, std::array<result_t,2>& output){
             //Assert the cell is not empty (i.e. assert it exists in the map)
             auto iter = grid.find(cell);
             if (iter==grid.end()){
@@ -134,24 +136,37 @@ class LowDimensionalGrid{
                 return;
             }
             //std::cout << "The cell "<<cell.to_string()<<" is not empty and i am indeed adding the points to the output"<< std::endl;
-            
+            //If a cell has all vertices inside the range, then add them to the sure vertices [position 0 in the result array]
             //Assert some intersection exists: get cell vertices' list and check whether any of them is below the radius threshold
+            bool all_included =true;
+            bool partial_intersection = false;
             for (point_t vertex : get_cell_vertices(cell)){
                 //If some intersection is possible, append the cell content to the output.
                 //Also, I add some fuzzyness for corner cases: better safe than sorry
                 if (distance_function_t{}(vertex, center)<= radius*radius* 1.00001){
                     //std::cout << "The cell "<<cell.to_string()<<" is not empty and i am indeed adding the points to the output"<< std::endl;
-                    output.insert(output.end(),grid[cell].begin(), grid[cell].end());
-                    return;
+                    partial_intersection = true;
+                }
+                else{
+                    all_included = false;
                 }
 
             }
+
+            if(all_included){
+
+                output[0].insert(output[0].end(),grid[cell].begin(), grid[cell].end());
+            }
+            else if (partial_intersection){
+                output[1].insert(output[1].end(), grid[cell].begin(), grid[cell].end());
+            }
+            return;
             //std::cout << "Cell "<< cell.to_string() <<" doesn't intersect the range."<<std::endl;
             
         }
         //Dimension sensitive loop unfolding
         template<std::size_t dim, typename query_func>
-        void  get_points_in_ball_intersecting_cells(const CellKey<dim>& min_cell, const CellKey<dim>& max_cell, CellKey<dim> current, query_func&& my_function, result_t& output, point_t center, distance_t radius, std::size_t d =0){
+        void  get_points_in_ball_intersecting_cells(const CellKey<dim>& min_cell, const CellKey<dim>& max_cell, CellKey<dim> current, query_func&& my_function, std::array<result_t,2>& output, point_t center, distance_t radius, std::size_t d =0){
 
             if (d==dim){
                 my_function(current, output,center, radius);
@@ -172,7 +187,6 @@ class LowDimensionalGrid{
             std::size_t num_vertices = 1<< dimension; //2^dimension
             std::vector<point_t> vertices;
             
-
 
             for (std::size_t mask =0; mask<num_vertices; ++mask) {
 
