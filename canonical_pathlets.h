@@ -94,7 +94,7 @@ class BinaryPathletTree{
         PathletNode& getNodeAt(int node_idx){
 
             assert(node_idx < pathlet_collection.size());
-            return pathlet_collection.at(node_idx);
+            return pathlet_collection.at(node_idx); //Should be returning without the id set 
 
         }
 
@@ -164,7 +164,49 @@ class BinaryPathletTree{
             
         }
 
-        
+        std::vector<PathletNode> getMinLengthPathlets(int min_length){
+            //Top down visit of the tree which retrieves all pathlets above the length threshold.
+            //Iterate through levels, from left to right, stop when the whole level if split would go under the threshold
+            std::vector<PathletNode> min_length_pathlets;
+
+            //Check the root
+            if( pathlet_collection.at(0).getLength()>=min_length){
+                min_length_pathlets.push_back(pathlet_collection.at(0));
+            }
+            else{
+                return min_length_pathlets;
+            }
+            //Check the children
+            int level_beginning = 1;
+            for (int level =1; level <= this->d; level++){
+
+                level_beginning = (int( pow(2, level))) -1;
+                //Iterate through the level 
+                int max_length_level = -1;
+                for (int k = 0; k<= level_beginning; k++){
+
+                    int position = level_beginning + k;
+                    PathletNode current  = this->pathlet_collection.at(position);
+                    if (current.isNULL){
+                        continue;
+                    }
+                    if(current.getLength()>=min_length){
+                        min_length_pathlets.push_back(current);
+
+                    }
+                    if(current.getLength()>=max_length_level){
+                        max_length_level= current.getLength();
+                    }
+                    
+                }
+
+                if(max_length_level/2.0 < min_length -1){
+                    break;
+                }
+            }
+
+            return min_length_pathlets;
+        }
 
         static inline int left_child_idx(int node_idx){
 

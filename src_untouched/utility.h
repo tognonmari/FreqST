@@ -30,11 +30,14 @@ public:
     reference operator[](const key_type &key) const {
         return data[key];
     }
-
+    trajectory_t::index_t size() const{
+        return data.get_actual_size();
+    }
 private:
     const trajectory_t &data;
 
 };
+
 
 template<typename T>
 const T::value_type& get(const T &map, const typename T::key_type &key) {

@@ -135,6 +135,9 @@ public:
     trajectory_collection slice_trajectory_by_id(id_t id){
 
         trajectory_collection result;
+        result.vertices.reserve(get_trajectory_size(id));
+        result.trajectory_id.reserve(get_trajectory_size(id));
+        result.original_trajectory_id.reserve(get_trajectory_size(id));
         index_t start = get_first_point_in_trajectory(id);
         for (index_t i = start; i<actual_size && get_id_at(i)== id; i++){
 
