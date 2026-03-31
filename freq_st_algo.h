@@ -18,6 +18,7 @@
 #include "trajectory.h"
 #include "canonical_pathlets.h"
 #include "curve_simplification.h"
+#include "grid_range_search.h"
 namespace frechet{
 
 struct freq_subtrajectory_algo_output_config{
@@ -32,12 +33,13 @@ class freq_subtrajectory_sampler{
 
     public:
     using space = m_space;
-    using range_search_t = kd_tree_range_search<space>;
+    
     using point_t = space::point_t;
     using distance_function_t = space::distance_function_t;
     using distance_t = distance_function_t::distance_t;
     using trajectory_t = trajectory_collection<space>;
     using index_t = trajectory_t::index_t;
+    using range_search_t = grid_range_search<space>;
     using subtrajectory_t = trajectory_t::subtrajectory_t;
     using id_t = trajectory_t::id_t;
 
@@ -46,7 +48,7 @@ class freq_subtrajectory_sampler{
         freq_subtrajectory_sampler(const trajectory_t& trajectory,
             float eps, 
             float del, 
-            distance_t radius, int minimum_length, int random_seed) : the_trajectory(trajectory), epsilon(eps), delta(del), distance_threshold(radius), min_length(minimum_length), seed(random_seed){
+            distance_t radius, int minimum_length, int random_seed, double grid_side_factor) : the_trajectory(trajectory), epsilon(eps), delta(del), distance_threshold(radius), min_length(minimum_length), seed(random_seed), grid_side_factor(grid_side_factor){
 
                 std::mt19937 seeded_generator(seed);
                 this->mt = seeded_generator;
@@ -145,9 +147,89 @@ class freq_subtrajectory_sampler{
             this->sample_trajectories(size);
         }
 
+        void generate_rough_vc_no_erase_sample(){
+
+            //Step 1: compute sample size according to rule. 
+            (this->sampled_trajs_ids).clear();
+
+            int sample_size = (int) (2 / (epsilon * epsilon)) * (this->rough_vc_dim_no_erase() + log(2 / delta));
+            std::cout << " Rough VCdim sample size with espilon "<<epsilon << ",  delta "<< delta <<", radius "<< distance_threshold<< " is: "<< sample_size <<std::endl;
+            //Step 2: assert sampling is worthwhile
+            if(sample_size > the_trajectory.num_trajectories()){
+
+                std::cerr << "VC Bound was too loose for your dataset."<< std::endl;
+
+                std::exit(1);
+
+            }
+            //Step 3: Sample indexes with replacement
+            this->sample_trajectories(sample_size);
+
+        }
     private:
+        int rough_vc_dim_no_erase(){
+        range_search_t search{the_trajectory, grid_side_factor*distance_threshold};
+        std::vector<int> c;
+        index_t last_seen_trajectory = the_trajectory.get_id_at(0);
+        int counter=0;
+        int total_distances = 0;
+        float squared_distance_threshold = distance_threshold*distance_threshold;
+        for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
+            if(i%10000 == 0){
+                
+            std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+
+            }
+            if(the_trajectory.get_id_at(i) == last_seen_trajectory){
+                
+                
+                int ss = search.search_no_erase(i, this->distance_threshold*distance_threshold).size();
+                counter +=ss;
+
+            }
+            else{
+
+                // Append the result up to now to c
+                c.push_back(floor(log2(counter*(1.0-(1/counter))) + 1));
+                //initialize the set again 
+                counter = 0;
+                last_seen_trajectory = the_trajectory.get_id_at(i);
+                int ss = search.search(i, this->distance_threshold*distance_threshold).size();
+                counter += ss;
+                //add info for the current point
+
+
+            }
+
+        }  
+        //std::cout<<total_distances << std::endl;
+        std::sort(c.begin(),c.end(), std::greater<>());
+        //std::cout <<"############ Details: #################\n";
+        /*
+        for (int i=0; i<c.size();i++){
+
+            std::cout<< " H index vector at position "<< i<< " "<< c.at(i)<<std::endl;
+
+        }
+        */
+
+        int vc_dim = 0;
+        
+        for(int i = 0 ; i < c.size(); i++){
+
+            if(vc_dim < c.at(i)){
+
+                vc_dim++;
+
+            }
+
+        }
+        std::cout <<"VC DIM ESTIMATE IS "<< vc_dim <<"\n";
+        return vc_dim;
+
+    }
     int rough_vc_dim(){
-        range_search_t search{the_trajectory};
+        range_search_t search{the_trajectory, grid_side_factor*distance_threshold};
         std::vector<int> c;
         index_t last_seen_trajectory = the_trajectory.get_id_at(0);
         int counter=0;
@@ -211,7 +293,7 @@ class freq_subtrajectory_sampler{
     int vc_dim(){
 
         //Compute VC Dimension 
-        range_search_t search{the_trajectory};
+        range_search_t search{the_trajectory,0.2*distance_threshold};
         std::vector<int> c;
         index_t last_seen_trajectory = the_trajectory.get_id_at(0);
         std::set<index_t> traj_set;
@@ -449,6 +531,7 @@ class freq_subtrajectory_sampler{
     int min_length;
     bool performed_sampling;
     int seed;
+    float grid_side_factor;
     
 };
 
@@ -555,7 +638,7 @@ class frequent_subtrajectory_algo{
                     //POPULATE FSG
                     //std::cout << fsg.to_string(sample,chunk) <<std::endl; 
                     this->populate_all_columns_with_labels_for_single_slice(fsg, chunk, pathlet_mother, pathlet_tree); //Should receive pathlet tree
-                    //std::cout << fsg.to_string(sample,chunk) <<std::endl; 
+                    std::cout << fsg.to_string(sample,chunk) <<std::endl; 
                     this->query_and_update_counts_for_all_pathlets(fsg, chunk, pathlet_tree);
                                       
                     
@@ -769,7 +852,11 @@ class frequent_subtrajectory_algo{
                     if (this->output_config.keep_matching_ids){
 
                         for (id_t idd : matching_ids){
-                            //std::cout << "Pathlet "<< pn.getPathlet().first <<" "<< pn.getPathlet().second<<" has matches with tid "<< idd<< std::endl;
+                            //if(pathlet_tree.getTrajectoryId() ==951 ||pathlet_tree.getTrajectoryId() ==1854 || pathlet_tree.getTrajectoryId() ==2237){
+                            //    if (idd ==951 ||idd ==1854 || idd ==2237){
+                                    std::cout << "Pathlet "<< pn.getPathlet().first <<" "<< pn.getPathlet().second<<"of trajectory "<<pathlet_tree.getTrajectoryId()<<" has matches with tid "<< idd<< std::endl;
+                            //    }
+                            //}
                             pn.addId(idd);
                         }
 

@@ -33,7 +33,8 @@ enum class sampling_mode {
     fixed_size = 0,
     chernoff = 1,
     vc = 2,
-    rough_vc = 3
+    rough_vc = 3,
+    rough_vc_no_erase = 4
 };
 
 int main(int argc, char** argv){
@@ -50,7 +51,7 @@ int main(int argc, char** argv){
     distance_t radius;
     std::string infilename, outfiledir;
     sampling_mode mode;
-
+    double grid_side_wrt_radius = 0.2;
     //Step 2: parse the input parameters
     
     CLI::App app{"Chernoff sampler for a trajectory dataset for frequent subtrajectory mining."};
@@ -81,11 +82,13 @@ int main(int argc, char** argv){
                    mode,
                    "Sampling mode: 0 for Fixed Size, 1 for Chernoff, 2 for VC, 3 for Rough VC Estimate.")
         ->required();
+    app.add_option("-g, --grid_side",
+                    grid_side_wrt_radius,
+                    "The fraction of the radius to be used as grid side for the vc dimension.");                    
     CLI11_PARSE(app, argc, argv);   
 
     trajectory_t dataset = read_trajectory_from_file<space>(infilename);
-    freq_subtrajectory_sampler<space> sampler(dataset, epsilon, delta, radius, minimum_length, seed );
-
+    freq_subtrajectory_sampler<space> sampler(dataset, epsilon, delta, radius, minimum_length, seed, grid_side_wrt_radius);
     switch(mode){
         case sampling_mode::fixed_size:{
             sampler.generate_fixed_size_sample(fixed_size);
@@ -98,18 +101,36 @@ int main(int argc, char** argv){
             break;
         }
         case sampling_mode::vc:{
+            auto start = chrono::high_resolution_clock::now();
             sampler.generate_vc_sample();
-            sampler.dump_sample_to_file(std::format("{}/vc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
+            auto end = chrono::high_resolution_clock::now();
+            auto duration = duration_cast<chrono::milliseconds>(end - start);
+            std::cout << "TIME: "<<duration.count() << std::endl;
+            
+            //sampler.dump_sample_to_file(std::format("{}/vc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
             break;
         }
         case sampling_mode::rough_vc:{
+            auto start = chrono::high_resolution_clock::now();
             sampler.generate_rough_vc_sample();
-            sampler.dump_sample_to_file(std::format("{}/roughvc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
+            auto end = chrono::high_resolution_clock::now();
+            auto duration = duration_cast<chrono::milliseconds>(end - start);
+            std::cout << "TIME: "<<duration.count() << std::endl;
+            //sampler.dump_sample_to_file(std::format("{}/roughvc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
             break;
         }
-    }
+        case sampling_mode::rough_vc_no_erase:{
+            auto start = chrono::high_resolution_clock::now();
+            sampler.generate_rough_vc_no_erase_sample();
+            auto end = chrono::high_resolution_clock::now();
+            auto duration = duration_cast<chrono::milliseconds>(end - start);
+            std::cout << "TIME: "<<duration.count() << std::endl;
+            //sampler.dump_sample_to_file(std::format("{}/roughvc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
+            break;
+        }
+    } 
 
-    //std::cout << "your seed is : " << seed <<std::endl;
+    //std::cout << "your seed  is : " << seed <<std::endl;
     
     
     //freq_subtrajectory_sampler<space> sampler(dataset, epsilon, delta, radius, minimum_length, seed );
