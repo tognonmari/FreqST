@@ -47,7 +47,6 @@ int main(int argc, char** argv){
 
     int minimum_length = 1;
     int seed = 0;
-    int fixed_size= -1;
     distance_t radius;
     std::string infilename, outfiledir;
     sampling_mode mode;
