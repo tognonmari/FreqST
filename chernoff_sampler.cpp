@@ -49,8 +49,10 @@ int main(int argc, char** argv){
     int seed = 0;
     distance_t radius = 50.0;
     std::string infilename, outfiledir;
+    std::string pathletsfilename = "";
     sampling_mode mode;
     double grid_side_wrt_radius = 0.2;
+    bool thorough = false;
     //Step 2: parse the input parameters
     
     CLI::App app{"Chernoff sampler for a trajectory dataset for frequent subtrajectory mining."};
@@ -67,6 +69,9 @@ int main(int argc, char** argv){
                    infilename,
                    "The trajectory file")
         ->required();
+    app.add_option("-p, --pathlets",
+                    pathletsfilename,
+                    "The file with the pathlets. If not given, it will be generated with the canonical pathlets from the input file. ");
     app.add_option("-c,--cardinality",
                    fixed_size,
                    "Fixed Size for fixed size sample generation.");
@@ -87,14 +92,25 @@ int main(int argc, char** argv){
         ->required();
     app.add_option("-g, --grid_side",
                     grid_side_wrt_radius,
-                    "The fraction of the radius to be used as grid side for the vc dimension.");                    
+                    "The fraction of the radius to be used as grid side for the vc dimension.");
+    app.add_option("-t, --thorough"
+                    , thorough,
+                    "Whether to be thorough in the vc sample generation, i.e. to look at both beginning pathlet points and ends.")
+                    ->transform(CLI::CheckedTransformer(std::map<std::string, bool>{{"0", false}, {"1", true}}));
     CLI11_PARSE(app, argc, argv);   
 
     trajectory_t dataset = read_trajectory_from_file<space>(infilename);
-    freq_subtrajectory_sampler<space> sampler(dataset, epsilon, delta, radius, minimum_length, seed, grid_side_wrt_radius);
+    if(pathletsfilename.empty()){
+        pathletsfilename = infilename;
+    }
+    trajectory_t pathlets = read_trajectory_from_file<space>(pathletsfilename);
+    freq_subtrajectory_sampler<space> sampler(dataset, pathlets, epsilon, delta, radius, minimum_length, seed, grid_side_wrt_radius, thorough);
 
     sampler.fill_beginnings_of_pathlet_vector();
-
+    std::cout << "PATHLETS: "<< sampler.get_pathlet_beginnings().size() << std::endl;
+    if (thorough){
+        sampler.fill_ends_of_pathlet_vector();
+    }
     switch(mode){
         case sampling_mode::fixed_size:{
             sampler.generate_fixed_size_sample(fixed_size);

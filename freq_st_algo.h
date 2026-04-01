@@ -45,21 +45,23 @@ class freq_subtrajectory_sampler{
     
     
     public:
-        freq_subtrajectory_sampler(const trajectory_t& trajectory,
+        freq_subtrajectory_sampler(const trajectory_t& trajectory, const trajectory_t& pathlets,
             float eps, 
             float del, 
-            distance_t radius, int minimum_length, int random_seed, double grid_side_factor) : the_trajectory(trajectory), epsilon(eps), delta(del), distance_threshold(radius), min_length(minimum_length), seed(random_seed), grid_side_factor(grid_side_factor){
+            distance_t radius, int minimum_length, int random_seed, double grid_side_factor, bool thorough) : the_trajectory(trajectory), the_pathlets(pathlets), epsilon(eps), delta(del), distance_threshold(radius), 
+                                                                                                                min_length(minimum_length), seed(random_seed), grid_side_factor(grid_side_factor), thorough(thorough){
 
                 std::mt19937 seeded_generator(seed);
                 this->mt = seeded_generator;
             }
+        
         void fill_beginnings_of_pathlet_vector(){
 
             //Given the dataset (this->the_trajectory;) and the min_legth, 
             //we detect the beginning points of the long pathelets and insert them in the beggining vectors.
             //These beginnings will be used to instantiate the grid in the vc dimension
-            id_t last_trajectory = the_trajectory.get_id_at(the_trajectory.get_actual_size()-1);
-            id_t current_visiting_id = the_trajectory.get_id_at(0);
+            id_t last_trajectory = the_pathlets.get_id_at(the_pathlets.get_actual_size()-1);
+            id_t current_visiting_id = the_pathlets.get_id_at(0);
             //Step one iterate through whole dataset and build a pathlet tree
             bool last_iter = false;
             while(true){
@@ -67,20 +69,20 @@ class freq_subtrajectory_sampler{
                 if(current_visiting_id ==last_trajectory){
                     last_iter = true;
                 }
-                trajectory_t pathlet_mother = the_trajectory.slice_trajectory_by_id(current_visiting_id);
+                trajectory_t pathlet_mother = the_pathlets.slice_trajectory_by_id(current_visiting_id);
                 BinaryPathletTree pathlet_tree(pathlet_mother, current_visiting_id, floor(log2(pathlet_mother.total_size())) + 1,1);
                 //For debugging purposes: print the tree
                 //std::cout<< "Pathelet tree for tid "<< current_visiting_id<< std::endl;
                 //std::cout << pathlet_tree.toString()<< std::endl;
                 
                 std::vector<PathletNode<space>> min_length_pathlets = pathlet_tree.getMinLengthPathlets(this-> min_length);
-
-                index_t trajectory_offset = the_trajectory.get_first_point_in_trajectory(current_visiting_id);
+                //std::cout<< "CALLING HERE for pm "<< current_visiting_id << std::endl;
+                index_t trajectory_offset = the_pathlets.get_first_point_in_trajectory(current_visiting_id);
                 for (auto& pathlet_node: min_length_pathlets){
 
                     index_t left_extreme = pathlet_node.pathlet.first;
                     
-                    this->pathlet_beginnings.insert({left_extreme + trajectory_offset, the_trajectory[left_extreme + trajectory_offset]});
+                    this->pathlet_beginnings.insert({left_extreme + trajectory_offset, the_pathlets[left_extreme + trajectory_offset]});
                 }
 
                 //Move on to the next trajectory
@@ -88,7 +90,7 @@ class freq_subtrajectory_sampler{
                     break;
                 }
 
-                current_visiting_id = the_trajectory.get_id_at(trajectory_offset + pathlet_mother.get_actual_size());
+                current_visiting_id = the_pathlets.get_id_at(trajectory_offset + pathlet_mother.get_actual_size());
 
             }
             //For each pathlet tree, go down from the root and if there's a node @ that level of length >= min_length add it.
@@ -103,6 +105,56 @@ class freq_subtrajectory_sampler{
 
 
         }
+        
+        void fill_ends_of_pathlet_vector(){
+            //Given the dataset (this->the_trajectory;) and the min_legth, 
+            //we detect the beginning points of the long pathelets and insert them in the beggining vectors.
+            //These beginnings will be used to instantiate the grid in the vc dimension
+            id_t last_trajectory = the_pathlets.get_id_at(the_pathlets.get_actual_size()-1);
+            id_t current_visiting_id = the_pathlets.get_id_at(0);
+            //Step one iterate through whole dataset and build a pathlet tree
+            bool last_iter = false;
+            while(true){
+                
+                if(current_visiting_id ==last_trajectory){
+                    last_iter = true;
+                }
+                trajectory_t pathlet_mother = the_pathlets.slice_trajectory_by_id(current_visiting_id);
+                BinaryPathletTree pathlet_tree(pathlet_mother, current_visiting_id, floor(log2(pathlet_mother.total_size())) + 1,1);
+                //For debugging purposes: print the tree
+                //std::cout<< "Pathelet tree for tid "<< current_visiting_id<< std::endl;
+                //std::cout << pathlet_tree.toString()<< std::endl;
+                
+                std::vector<PathletNode<space>> min_length_pathlets = pathlet_tree.getMinLengthPathlets(this-> min_length);
+                //std::cout<< "CALLING HERE for pm "<< current_visiting_id << std::endl;
+                index_t trajectory_offset = the_pathlets.get_first_point_in_trajectory(current_visiting_id);
+                for (auto& pathlet_node: min_length_pathlets){
+
+                    index_t right_extreme = pathlet_node.pathlet.second;
+                    index_t left_extreme = pathlet_node.pathlet.first; //I use the first point of the pathelt as a key to the pathlet
+                    this->pathlet_ends.insert({left_extreme + trajectory_offset, the_pathlets[right_extreme + trajectory_offset]});
+                }
+
+                //Move on to the next trajectory
+                if(last_iter){
+                    break;
+                }
+
+                current_visiting_id = the_pathlets.get_id_at(trajectory_offset + pathlet_mother.get_actual_size());
+
+            }
+            //For each pathlet tree, go down from the root and if there's a node @ that level of length >= min_length add it.
+            //Stop when along the level all pathelts are shorter. 
+             
+            //For debugging purposes: print the pathlet beginnings 
+            //std::cout << "The pathlet beginnings are : "<< std::endl;
+            //for (const auto& pt : this->pathlet_beginnings){
+            //    std::cout<< pt.first <<"\n";
+            //}
+
+
+        }
+        
         void generate_chernoff_sample(){
 
             //Step 1: compute sample size according to Chernoff rule. 
@@ -226,17 +278,27 @@ class freq_subtrajectory_sampler{
 
         int rough_vc_dim_no_erase(){
 
-            range_search_t search{the_trajectory[0], grid_side_factor*distance_threshold};
+            range_search_t search{the_pathlets[0], grid_side_factor*distance_threshold};
 
             for (const auto& pair : this->pathlet_beginnings){
 
                 search.insert(pair.first, pair.second);
             }
-        
+            
+            range_search_t search_ends{the_pathlets[0], grid_side_factor*distance_threshold};
+
+            if(thorough && min_length >=3){
+                for (const auto& pair : this->pathlet_ends){
+
+                search_ends.insert(pair.first, pair.second);
+                }
+                assert(search_ends.num_elements() == search.num_elements());
+            }
         
             std::vector<int> c;
             index_t last_seen_trajectory = the_trajectory.get_id_at(0);
             int counter=0;
+            int counter_ends =0; 
             int total_distances = 0;
             float squared_distance_threshold = distance_threshold*distance_threshold;
             for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
@@ -250,17 +312,30 @@ class freq_subtrajectory_sampler{
                     
                     int ss = search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold).size();
                     counter +=ss;
+                    if(thorough && min_length >=3){
+                        int ss_ends = search_ends.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold).size();
+                        counter_ends += ss_ends;
+                    }
 
                 }
                 else{
 
+                    int min_c = counter;
+                    if(thorough && min_length >= 3){
+                        
+                        min_c = std::min(counter, counter_ends);
+                    }
                     // Append the result up to now to c
-                    c.push_back(floor(log2(counter*(1.0-(1/counter))) + 1));
+                    c.push_back(floor(log2(min_c*(1.0-(1/min_c))) + 1));
                     //initialize the set again 
                     counter = 0;
                     last_seen_trajectory = the_trajectory.get_id_at(i);
                     int ss = search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold).size();
                     counter += ss;
+                    if(thorough && min_length >=3){
+                        int ss_ends = search_ends.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold).size();
+                        counter_ends += ss_ends;
+                    }
                     //add info for the current point
 
 
@@ -295,17 +370,28 @@ class freq_subtrajectory_sampler{
         }
 
         int rough_vc_dim(){
-            range_search_t search{the_trajectory[0], grid_side_factor*distance_threshold};
+            range_search_t search{the_pathlets[0], grid_side_factor*distance_threshold};
 
             for (const auto& pair : this->pathlet_beginnings){
 
                 search.insert(pair.first, pair.second);
             }
         
-        
+            
+            range_search_t search_ends{the_pathlets[0], grid_side_factor*distance_threshold};
+
+            if(thorough && min_length >=3){
+                for (const auto& pair : this->pathlet_ends){
+
+                search_ends.insert(pair.first, pair.second);
+                }
+                assert(search_ends.num_elements() == search.num_elements());
+            }
+            
             std::vector<int> c;
             index_t last_seen_trajectory = the_trajectory.get_id_at(0);
             int counter=0;
+            int counter_ends = 0;
             int total_distances = 0;
             float squared_distance_threshold = distance_threshold*distance_threshold;
             for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
@@ -319,17 +405,32 @@ class freq_subtrajectory_sampler{
                     
                     int ss = search.search(the_trajectory[i], this->distance_threshold*distance_threshold).size();
                     counter +=ss;
+                    if(thorough && min_length >=3){
+                        int ss_ends = search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold).size();
+                        counter_ends += ss_ends;
+                    }
 
                 }
                 else{
 
-                    // Append the result up to now to c
-                    c.push_back(floor(log2(counter*(1.0-(1/counter))) + 1));
+                    // Append the result up to now to c+
+                    int min_c = counter;
+
+                    if(thorough && min_length >= 3){
+                        
+                        min_c = std::min(counter, counter_ends);
+                    }
+                    c.push_back(floor(log2(min_c*(1.0-(1/min_c))) + 1));
                     //initialize the set again 
                     counter = 0;
+                    counter_ends= 0;
                     last_seen_trajectory = the_trajectory.get_id_at(i);
                     int ss = search.search(the_trajectory[i], this->distance_threshold*distance_threshold).size();
                     counter += ss;
+                    if(thorough && min_length >=3){
+                        int ss_ends = search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold).size();
+                        counter_ends += ss_ends;
+                    }
                     //add info for the current point
 
 
@@ -366,7 +467,7 @@ class freq_subtrajectory_sampler{
         int vc_dim(){
 
             //Compute VC Dimension 
-            range_search_t search{the_trajectory[0], grid_side_factor*distance_threshold};
+            range_search_t search{the_pathlets[0], grid_side_factor*distance_threshold};
         
 
             for (const auto& pair : this->pathlet_beginnings){
@@ -374,11 +475,22 @@ class freq_subtrajectory_sampler{
                 search.insert(pair.first, pair.second);
             }
             
+            range_search_t search_ends{the_pathlets[0], grid_side_factor*distance_threshold};
+
+            if(thorough && min_length >=3){
+                for (const auto& pair : this->pathlet_ends){
+
+                search_ends.insert(pair.first, pair.second);
+                }
+                assert(search_ends.num_elements() == search.num_elements());
+            }
+
             assert(search.num_elements() == this->pathlet_beginnings.size());
             
             std::vector<int> c;
             index_t last_seen_trajectory = the_trajectory.get_id_at(0);
-            std::set<index_t> traj_set;
+            std::set<index_t> traj_set_beginnings;
+            std::set<index_t> traj_set_ends;
             float squared_distance_threshold = distance_threshold *distance_threshold;
             for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
                 if(i%10000 == 0){
@@ -402,25 +514,43 @@ class freq_subtrajectory_sampler{
 
                     for (const auto idx: search.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
 
-                        traj_set.insert(idx);
+                        traj_set_beginnings.insert(idx);
 
+                    }
+
+                    if(thorough && min_length >=3){
+
+                        for (const auto idx: search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+
+                        traj_set_ends.insert(idx);
+
+                    }
                     }
                 }
                 else{
                     
                     // Append the result up to now to c
-                    c.push_back(floor(log2(traj_set.size()) + 1));
+                    c.push_back(floor(log2(std::count_if(traj_set_beginnings.begin(), traj_set_beginnings.end(), [&](const auto& x){ return traj_set_ends.contains(x); })) + 1));
                     //initialize the set again 
-                    traj_set.clear();
+                    traj_set_beginnings.clear();
+                    traj_set_ends.clear();
                     last_seen_trajectory = the_trajectory.get_id_at(i);
                     //add info for the current point
                     for (const auto idx: search.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
 
-                        traj_set.insert(idx);
+                        traj_set_beginnings.insert(idx);
 
                     }
 
+                    if(thorough && min_length >=3){
 
+                        for (const auto idx: search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+
+                        traj_set_ends.insert(idx);
+
+                    }
+
+                    }
                 }
 
             }
@@ -538,12 +668,12 @@ class freq_subtrajectory_sampler{
         return;
     }
 
-        int total_pathlet_number_respecting_ids(){
+    int total_pathlet_number_respecting_ids(){
         int total = 0;
 
-        for (id_t i = 0; i < the_trajectory.num_trajectories(); i ++){
+        for (id_t i = 0; i < the_pathlets.num_trajectories(); i ++){
 
-            total += 2 * ceil(( the_trajectory.get_trajectory_size(i) / min_length));
+            total += 2 * ceil(( the_pathlets.get_trajectory_size(i) / min_length));
 
         }
 
@@ -602,9 +732,12 @@ class freq_subtrajectory_sampler{
 
     std::mt19937 mt;
     std::map<index_t, point_t> pathlet_beginnings;
+    std::map<index_t, point_t> pathlet_ends;
     std::vector<id_t> sampled_trajs_ids;
     trajectory_t the_trajectory;
+    trajectory_t the_pathlets;
     distance_t distance_threshold;
+    bool thorough;
     float epsilon;
     float delta;
     int min_length;
@@ -717,7 +850,7 @@ class frequent_subtrajectory_algo{
                     //POPULATE FSG
                     //std::cout << fsg.to_string(sample,chunk) <<std::endl; 
                     this->populate_all_columns_with_labels_for_single_slice(fsg, chunk, pathlet_mother, pathlet_tree); //Should receive pathlet tree
-                    std::cout << fsg.to_string(sample,chunk) <<std::endl; 
+                    //std::cout << fsg.to_string(sample,chunk) <<std::endl; 
                     this->query_and_update_counts_for_all_pathlets(fsg, chunk, pathlet_tree);
                                       
                     
@@ -1075,4 +1208,5 @@ class frequent_subtrajectory_algo{
         freq_subtrajectory_algo_output_config output_config;
         
 };
-}
+};
+
