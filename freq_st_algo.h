@@ -199,6 +199,28 @@ class freq_subtrajectory_sampler{
             this->sample_trajectories(sample_size);
             
         }
+
+        void generate_vc_no_erase_sample(){
+
+            //Step 1: compute sample size according to rule. 
+
+            (this->sampled_trajs_ids).clear();
+
+            int sample_size = (int) (2 / (epsilon * epsilon)) * (this->vc_dim_no_erase()+ log(2 / delta));
+            std::cout << "VCdim sample size with espilon "<<epsilon << ",  delta "<< delta <<", radius "<< distance_threshold<< " is: "<< sample_size <<std::endl;
+            //Step 2: assert sampling is worthwhile
+            
+            if(sample_size > the_trajectory.num_trajectories()){
+
+                std::cerr << "VC Bound was too loose for your dataset."<< std::endl;
+
+                std::exit(1);
+
+            }
+            //Step 3: Sample indexes with replacement
+            this->sample_trajectories(sample_size);
+            
+        }
         //VC dimension estimate is faster but coarse
         void generate_rough_vc_sample(){
 
@@ -530,7 +552,14 @@ class freq_subtrajectory_sampler{
                 else{
                     
                     // Append the result up to now to c
-                    c.push_back(floor(log2(std::count_if(traj_set_beginnings.begin(), traj_set_beginnings.end(), [&](const auto& x){ return traj_set_ends.contains(x); })) + 1));
+                    if(thorough && min_length >=3){
+                        c.push_back(floor(log2(std::count_if(traj_set_beginnings.begin(), traj_set_beginnings.end(), [&](const auto& x){ return traj_set_ends.contains(x); })) + 1));
+
+                    }
+                    else{
+                        c.push_back(floor(log2(traj_set_beginnings.size()) + 1));
+                    }
+                    
                     //initialize the set again 
                     traj_set_beginnings.clear();
                     traj_set_ends.clear();
@@ -571,6 +600,120 @@ class freq_subtrajectory_sampler{
             return vc_dim;
         }
     
+        int vc_dim_no_erase(){
+
+            //Compute VC Dimension 
+            range_search_t search{the_pathlets[0], grid_side_factor*distance_threshold};
+        
+
+            for (const auto& pair : this->pathlet_beginnings){
+
+                search.insert(pair.first, pair.second);
+            }
+            
+            range_search_t search_ends{the_pathlets[0], grid_side_factor*distance_threshold};
+
+            if(thorough && min_length >=3){
+                for (const auto& pair : this->pathlet_ends){
+
+                search_ends.insert(pair.first, pair.second);
+                }
+                assert(search_ends.num_elements() == search.num_elements());
+            }
+
+            assert(search.num_elements() == this->pathlet_beginnings.size());
+            
+            std::vector<int> c;
+            index_t last_seen_trajectory = the_trajectory.get_id_at(0);
+            std::set<index_t> traj_set_beginnings;
+            std::set<index_t> traj_set_ends;
+            float squared_distance_threshold = distance_threshold *distance_threshold;
+            for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
+                if(i%10000 == 0){
+                    
+                std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+
+                }
+                if(the_trajectory.get_id_at(i) == last_seen_trajectory){
+
+                    point_t point = the_trajectory[i];
+                    /*
+                    for (int jj=0; jj<the_trajectory.total_size(); jj++){
+
+                        if(auto d_ij = distance_function_t{}(the_trajectory[jj], point)< squared_distance_threshold){
+                            //counter +=1;
+                            traj_set.insert((sindex_t)jj);
+                        }
+
+                    }
+                    */
+
+                    for (const auto idx: search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+
+                        traj_set_beginnings.insert(idx);
+
+                    }
+
+                    if(thorough && min_length >=3){
+
+                        for (const auto idx: search_ends.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+
+                        traj_set_ends.insert(idx);
+
+                    }
+                    }
+                }
+                else{
+                    
+                    // Append the result up to now to c
+                    if(thorough && min_length >=3){
+                        c.push_back(floor(log2(std::count_if(traj_set_beginnings.begin(), traj_set_beginnings.end(), [&](const auto& x){ return traj_set_ends.contains(x); })) + 1));
+
+                    }
+                    else{
+                        c.push_back(floor(log2(traj_set_beginnings.size()) + 1));
+                    }
+                    
+                    //initialize the set again 
+                    traj_set_beginnings.clear();
+                    traj_set_ends.clear();
+                    last_seen_trajectory = the_trajectory.get_id_at(i);
+                    //add info for the current point
+                    for (const auto idx: search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+
+                        traj_set_beginnings.insert(idx);
+
+                    }
+
+                    if(thorough && min_length >=3){
+
+                        for (const auto idx: search_ends.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+
+                        traj_set_ends.insert(idx);
+
+                    }
+
+                    }
+                }
+
+            }
+            std::sort(c.begin(),c.end(), std::greater<>());
+            
+            int vc_dim = 0;
+            
+            for(int i = 0 ; i < c.size(); i++){
+
+                if(vc_dim < c.at(i)){
+
+                    vc_dim++;
+
+                }
+
+            }
+            std::cout <<"VC DIM ESTIMATE IS "<< vc_dim <<"\n";
+            return vc_dim;
+        }
+
     /*
     int aggressive_vc_dim(){
 
@@ -656,30 +799,30 @@ class freq_subtrajectory_sampler{
     
         void print_subtrajectory_to_file(std::ofstream& fout, id_t& id){
 
-        size_t n = the_trajectory.num_trajectories();
-        index_t j = the_trajectory.get_first_point_in_trajectory(id%n);
-        
-        while( the_trajectory.get_id_at(j) == id%n){
+            size_t n = the_trajectory.num_trajectories();
+            index_t j = the_trajectory.get_first_point_in_trajectory(id%n);
             
-            fout << the_trajectory[j].x()<< " "<< the_trajectory[j].y()<<" "<< id<<std::endl;
-            j++;
+            while( the_trajectory.get_id_at(j) == id%n){
+                
+                fout << the_trajectory[j].x()<< " "<< the_trajectory[j].y()<<" "<< id<<std::endl;
+                j++;
+            }
+
+            return;
         }
 
-        return;
-    }
+        int total_pathlet_number_respecting_ids(){
+            int total = 0;
 
-    int total_pathlet_number_respecting_ids(){
-        int total = 0;
+            for (id_t i = 0; i < the_pathlets.num_trajectories(); i ++){
 
-        for (id_t i = 0; i < the_pathlets.num_trajectories(); i ++){
+                total += 2 * ceil(( the_pathlets.get_trajectory_size(i) / min_length));
 
-            total += 2 * ceil(( the_pathlets.get_trajectory_size(i) / min_length));
+            }
+
+            return total;
 
         }
-
-        return total;
-
-    }
     
         void sample_trajectories(int sample_size){
 
