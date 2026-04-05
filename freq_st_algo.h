@@ -240,11 +240,11 @@ class freq_subtrajectory_sampler{
             int total_distances = 0;
             float squared_distance_threshold = distance_threshold*distance_threshold;
             for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-                if(i%10000 == 0){
+                //if(i%10000 == 0){
                     
-                std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+                //std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
 
-                }
+                //}
                 if(the_trajectory.get_id_at(i) == last_seen_trajectory){
                     
                     
@@ -309,11 +309,11 @@ class freq_subtrajectory_sampler{
             int total_distances = 0;
             float squared_distance_threshold = distance_threshold*distance_threshold;
             for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-                if(i%10000 == 0){
+                //if(i%10000 == 0){
                     
-                std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+                //std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
 
-                }
+                //}
                 if(the_trajectory.get_id_at(i) == last_seen_trajectory){
                     
                     
@@ -381,11 +381,11 @@ class freq_subtrajectory_sampler{
             std::set<index_t> traj_set;
             float squared_distance_threshold = distance_threshold *distance_threshold;
             for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-                if(i%10000 == 0){
+                //if(i%10000 == 0){
                     
-                std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+                //std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
 
-                }
+                //}
                 if(the_trajectory.get_id_at(i) == last_seen_trajectory){
 
                     point_t point = the_trajectory[i];

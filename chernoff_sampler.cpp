@@ -92,9 +92,13 @@ int main(int argc, char** argv){
 
     trajectory_t dataset = read_trajectory_from_file<space>(infilename);
     freq_subtrajectory_sampler<space> sampler(dataset, epsilon, delta, radius, minimum_length, seed, grid_side_wrt_radius);
-
+    std::cout << "DATASET: "<<infilename<< std::endl;
+    std::cout << "SAMPLING MODE: "<< ((int) mode) <<std::endl;
+    std::cout<< "RADIUS: "<< radius<< std::endl;
+    std::cout<< "GRID SIDE FACTOR: "<<grid_side_wrt_radius<< std::endl;
+    std::cout << "MIN LENGTH: "<< minimum_length << std::endl;
     sampler.fill_beginnings_of_pathlet_vector();
-
+    std::cout<< "PATHLETS: "<<sampler.get_pathlet_beginnings().size()<< std::endl;
     switch(mode){
         case sampling_mode::fixed_size:{
             sampler.generate_fixed_size_sample(fixed_size);
