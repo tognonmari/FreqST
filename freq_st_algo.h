@@ -26,6 +26,7 @@ struct freq_subtrajectory_algo_output_config{
     bool maximal = false;
     bool keep_matching_ids = false;
     int min_length = 1;
+    std::string path_to_temporary_pathlet_dump = "./vc_dim_dump_files"; //One row per pathlet with the matches-> this is to use less memorhy for the exact computation
 
 };
 template<metric_space m_space>
@@ -33,7 +34,6 @@ class freq_subtrajectory_sampler{
 
     public:
     using space = m_space;
-    
     using point_t = space::point_t;
     using distance_function_t = space::distance_function_t;
     using distance_t = distance_function_t::distance_t;
@@ -43,13 +43,35 @@ class freq_subtrajectory_sampler{
     using subtrajectory_t = trajectory_t::subtrajectory_t;
     using id_t = trajectory_t::id_t;
     
-    
+    private: 
+        struct transaction_and_points_pair{
+            //Fields
+            index_t traj_id;
+            std::vector<index_t> closeby_points; 
+            int capacity_ub;
+            //I want to rank the more popular transactions first 
+            bool operator<(const transaction_and_points_pair& other) const {
+
+                if(closeby_points.size()<other.closeby_points.size()){
+                    return false;
+                }
+                if(closeby_points.size()>other.closeby_points.size()){
+                    return true;
+                }
+                return traj_id<other.traj_id;
+            }
+
+            bool operator==(const transaction_and_points_pair& other ) const{
+                return traj_id == other->traj_id;
+            }
+            
+        };
     public:
         freq_subtrajectory_sampler(const trajectory_t& trajectory, const trajectory_t& pathlets,
             float eps, 
             float del, 
-            distance_t radius, int minimum_length, int random_seed, double grid_side_factor, bool thorough) : the_trajectory(trajectory), the_pathlets(pathlets), epsilon(eps), delta(del), distance_threshold(radius), 
-                                                                                                                min_length(minimum_length), seed(random_seed), grid_side_factor(grid_side_factor), thorough(thorough){
+            distance_t radius, int minimum_length, int random_seed, double grid_side_factor, bool thorough, bool inspect) : the_trajectory(trajectory), the_pathlets(pathlets), epsilon(eps), delta(del), distance_threshold(radius), 
+                                                                                                                min_length(minimum_length), seed(random_seed), grid_side_factor(grid_side_factor), thorough(thorough) , inspect(inspect){
 
                 std::mt19937 seeded_generator(seed);
                 this->mt = seeded_generator;
@@ -316,10 +338,11 @@ class freq_subtrajectory_sampler{
                 }
                 assert(search_ends.num_elements() == search.num_elements());
             }
-        
-            std::vector<int> c;
+            int d = 0;
+            std::set<transaction_and_points_pair> c;
             index_t last_seen_trajectory = the_trajectory.get_id_at(0);
             int counter=0;
+            std::vector<index_t> retrieved_points_with_duplicates;
             int counter_ends =0; 
             int total_distances = 0;
             float squared_distance_threshold = distance_threshold*distance_threshold;
@@ -332,12 +355,15 @@ class freq_subtrajectory_sampler{
                 if(the_trajectory.get_id_at(i) == last_seen_trajectory){
                     
                     
-                    int ss = search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold).size();
-                    counter +=ss;
+                    std::vector<index_t> retrieved_points = search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold);
+                    counter +=retrieved_points.size();
+                    retrieved_points_with_duplicates.insert(retrieved_points_with_duplicates.end(), retrieved_points.begin(), retrieved_points.end());
                     if(thorough && min_length >=3){
                         int ss_ends = search_ends.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold).size();
                         counter_ends += ss_ends;
                     }
+
+                    
 
                 }
                 else{
@@ -348,12 +374,28 @@ class freq_subtrajectory_sampler{
                         min_c = std::min(counter, counter_ends);
                     }
                     // Append the result up to now to c
-                    c.push_back(floor(log2(min_c*(1.0-(1/min_c))) + 1));
+                    if(floor(log2(min_c*(1.0-(1/min_c))) + 1) > d) {
+
+                        c.insert(transaction_and_points_pair{last_seen_trajectory, retrieved_points_with_duplicates,floor(log2(min_c*(1.0-(1/min_c))) + 1)});
+                        int l_prime = prev(c.end())->capacity_ub;
+                        if(l_prime >d){
+                            d++;
+                        }
+                        else{
+
+                            c.erase(prev(c.end()));
+
+                        }
+                    }
+                    //c.push_back(floor(log2(min_c*(1.0-(1/min_c))) + 1));
+                    
                     //initialize the set again 
                     counter = 0;
+                    retrieved_points_with_duplicates.clear();
                     last_seen_trajectory = the_trajectory.get_id_at(i);
-                    int ss = search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold).size();
-                    counter += ss;
+                    std::vector<index_t> retrieved_points = search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold);
+                    counter +=retrieved_points.size();
+                    retrieved_points_with_duplicates.insert(retrieved_points_with_duplicates.end(), retrieved_points.begin(), retrieved_points.end());
                     if(thorough && min_length >=3){
                         int ss_ends = search_ends.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold).size();
                         counter_ends += ss_ends;
@@ -365,7 +407,7 @@ class freq_subtrajectory_sampler{
 
             }  
             //std::cout<<total_distances << std::endl;
-            std::sort(c.begin(),c.end(), std::greater<>());
+            //std::sort(c.begin(),c.end(), std::greater<>());
             //std::cout <<"############ Details: #################\n";
             /*
             for (int i=0; i<c.size();i++){
@@ -374,10 +416,10 @@ class freq_subtrajectory_sampler{
 
             }
             */
-
-            int vc_dim = 0;
             
-            for(int i = 0 ; i < c.size(); i++){
+            int vc_dim = prev(c.end())->capacity_ub;
+            /*
+             for(int i = 0 ; i < c.size(); i++){
 
                 if(vc_dim < c.at(i)){
 
@@ -386,7 +428,15 @@ class freq_subtrajectory_sampler{
                 }
 
             }
+            
+            */
+           
             std::cout <<"VC DIM ESTIMATE IS "<< vc_dim <<"\n";
+            if(inspect){
+
+                print_duplicate_statistics(c);
+
+            }
             return vc_dim;
 
         }
@@ -637,16 +687,7 @@ class freq_subtrajectory_sampler{
                 if(the_trajectory.get_id_at(i) == last_seen_trajectory){
 
                     point_t point = the_trajectory[i];
-                    /*
-                    for (int jj=0; jj<the_trajectory.total_size(); jj++){
-
-                        if(auto d_ij = distance_function_t{}(the_trajectory[jj], point)< squared_distance_threshold){
-                            //counter +=1;
-                            traj_set.insert((sindex_t)jj);
-                        }
-
-                    }
-                    */
+                    
 
                     for (const auto idx: search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
 
@@ -872,6 +913,43 @@ class freq_subtrajectory_sampler{
         return;
     }
 
+        void print_duplicate_statistics(std::set<transaction_and_points_pair>& c){
+
+            for (auto& pair : c){
+                //sort the retrieved points for each participating transaction
+                std::vector<index_t> replica = pair.closeby_points;
+                std::sort(replica.begin(), replica.end(), std::greater<>()); // this is indifferent
+                // Now for each pathlet count the #of occurrences...
+                index_t last_seen = -1;
+                int occurrences = 0;
+                std::vector<int> counters;
+                for (index_t pt : replica){
+                    if (pt != last_seen){
+                        if (occurrences !=0){
+                            
+                            counters.push_back(occurrences);
+
+                        }
+                        occurrences = 1;
+                        last_seen = pt;
+
+                    }
+                    else{
+                        occurrences++;
+                    }
+                }
+                std::sort(counters.begin(), counters.end(), std::greater<>());
+                float mean = std::reduce(counters.begin(), counters.end()) / ((float)(counters.size()));
+                std::cout << "=====================\n";
+                std::cout << std::format("TRANSACTION : {}\n", pair.traj_id);
+                std::cout << std::format("NUMBER OF REPORTED POINTS : {}\n", replica.size());
+                std::cout << std::format("AVERAGE NUMBER OF REPETITIONS : {}\n", mean);
+                std::cout << std::format("TOP 3 NUMBER OF REPETITIONS : {}, {}, {}\n", counters.at(0), counters.at(1), counters.at(2) );
+
+            }
+
+            return;
+        }
 
     std::mt19937 mt;
     std::map<index_t, point_t> pathlet_beginnings;
@@ -887,6 +965,7 @@ class freq_subtrajectory_sampler{
     bool performed_sampling;
     int seed;
     float grid_side_factor;
+    bool inspect;
     
 };
 
@@ -1209,7 +1288,7 @@ class frequent_subtrajectory_algo{
                         for (id_t idd : matching_ids){
                             //if(pathlet_tree.getTrajectoryId() ==951 ||pathlet_tree.getTrajectoryId() ==1854 || pathlet_tree.getTrajectoryId() ==2237){
                             //    if (idd ==951 ||idd ==1854 || idd ==2237){
-                                    std::cout << "Pathlet "<< pn.getPathlet().first <<" "<< pn.getPathlet().second<<"of trajectory "<<pathlet_tree.getTrajectoryId()<<" has matches with tid "<< idd<< std::endl;
+                                    //std::cout << "Pathlet "<< pn.getPathlet().first <<" "<< pn.getPathlet().second<<"of trajectory "<<pathlet_tree.getTrajectoryId()<<" has matches with tid "<< idd<< std::endl;
                             //    }
                             //}
                             pn.addId(idd);

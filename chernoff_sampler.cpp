@@ -49,7 +49,7 @@ int main(int argc, char** argv){
 
     float epsilon = 0.1;
     float delta = 0.05;
-
+    bool inspect_higher_vectors = false;
     int minimum_length = 1;
     int seed = 0;
     distance_t radius = 50.0;
@@ -98,6 +98,11 @@ int main(int argc, char** argv){
     app.add_option("-g, --grid_side",
                     grid_side_wrt_radius,
                     "The fraction of the radius to be used as grid side f or the vc dimension.");
+    app.add_option("-i, --inspect",
+                    inspect_higher_vectors,
+                    "Whether to print stats for the number of repetitions of points")
+                    ->transform(CLI::CheckedTransformer(std::map<std::string, bool>{{"0", false}, {"1", true}}));
+    
     CLI11_PARSE(app, argc, argv);   
 
     trajectory_t dataset = read_trajectory_from_file<space>(infilename);
@@ -110,7 +115,7 @@ int main(int argc, char** argv){
         thorough = true;
     }
     trajectory_t pathlets = read_trajectory_from_file<space>(pathletsfilename);
-    freq_subtrajectory_sampler<space> sampler(dataset, pathlets, epsilon, delta, radius, minimum_length, seed, grid_side_wrt_radius, thorough);
+    freq_subtrajectory_sampler<space> sampler(dataset, pathlets, epsilon, delta, radius, minimum_length, seed, grid_side_wrt_radius, thorough, inspect_higher_vectors);
 
     sampler.fill_beginnings_of_pathlet_vector();
     std::cout << "PATHLETS: "<< sampler.get_pathlet_beginnings().size() << std::endl;
