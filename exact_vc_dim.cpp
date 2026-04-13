@@ -61,7 +61,7 @@ int main(int argc, char** argv){
     extractor.convert_supports_to_bitsets();
     std::cout << "Finished conversion to bitsets \n";
     int vc_dim = extractor.compute_exact_vc_dimension();
-    std::cout<< "Exact vc dim for dataset at distance "<< radius << " is: "<< vc_dim;
+    std::cout<< "Exact vc dim for dataset at distance "<< radius << " is: "<< vc_dim<< std::endl;
 
     return 0;
 }
