@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <random>
 #include <boost/container/flat_set.hpp>
-
+#include "roaring.hh"
 
 #include "free_space_graph_free_axis.h"
 #include "kdtree_range_search.h"
@@ -989,7 +989,7 @@ class frequent_subtrajectory_algo{
             id_t pathlet_mother;
             float frequency;
             float efficacy=-1.0;
-            std::set<id_t> supporting_trajectories;
+            roaring::Roaring supporting_trajectories;
             friend inline bool operator<(const frequent_pathlet& lhs, const frequent_pathlet& rhs){
                 
                 int lhs_length = lhs.extremes.second -lhs.extremes.first +1;

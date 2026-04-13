@@ -2,6 +2,8 @@
 #include <cmath>
 #include <vector>
 #include <queue>
+#include "roaring.hh"
+
 #include "trajectory.h"
 #include "metric_space.h"
 namespace frechet{
@@ -19,7 +21,7 @@ class PathletNode{
         bool frequent; //Constructor sets it to true by default
         float frequency= 0.0;
         subtrajectory_t pathlet;
-        std::set<id_t> supporting_trajectories;
+        roaring::Roaring supporting_trajectories;
     
         PathletNode(int left, int right) : pathlet({left, right}), frequent(true), isNULL(false){}
         inline int getLength(){ return this->pathlet.second - this-> pathlet.first + 1; }
@@ -27,8 +29,8 @@ class PathletNode{
         inline subtrajectory_t getPathlet(){ return this->pathlet; }
         inline bool isFrequent() { return this-> frequent; }
         inline void setNULL(){this->isNULL = true;}
-        inline void addId(id_t id){this->supporting_trajectories.insert(id);}
-        inline std::set<id_t> getSupportingTrajectories(){return this->supporting_trajectories;}
+        inline void addId(id_t id){this->supporting_trajectories.add(id);}
+        inline roaring::Roaring getSupportingTrajectories(){return this->supporting_trajectories;}
 };
 
 //represents a collection of pathlets organized as a tree, based on a subtrajectory taken from a trajectory collection

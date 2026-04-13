@@ -29,7 +29,7 @@ int main(int argc, char** argv){
 
     //Step 1: initialize config variables
     freq_subtrajectory_algo_output_config output_config;
-    distance_t radius;
+    distance_t radius;  
     float frequency_threshold, epsilon, delta;
     int minimum_length = 1;
     std::string infilename, outfilename, pathlet_file_name;
