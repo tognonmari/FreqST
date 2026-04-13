@@ -1,6 +1,7 @@
 #include "freq_st_algo.h"
 #include <bitset>
 #include <boost/dynamic_bitset.hpp>
+#include "roaring.hh"
 namespace frechet{
 template <metric_space space>
 class RangeBitset{
@@ -153,7 +154,89 @@ class RangeSet{
         std::set<id_t> range;
     
 };
+template <metric_space space>
+class RangeRoaringBitmap{
 
+        public:
+        using id_t = typename frequent_subtrajectory_algo<space>::id_t;
+        RangeRoaringBitmap(int num_trajectories, std::set<id_t> range_ids){
+            for (id_t tid : range_ids){
+
+                range.add(tid);
+
+            }
+        }
+        RangeRoaringBitmap(int num_trajectories, roaring::Roaring range_ids){
+            range= range_ids;
+        }
+        RangeRoaringBitmap(roaring::Roaring range_ids){
+
+            range = range_ids;
+
+        }
+        
+
+        bool operator<(const RangeRoaringBitmap<space>& b)const {
+
+            //IF THEY HAVE THE SAME SIZE:
+
+            if (this->range.cardinality() == b.range.cardinality()){
+                
+                return std::lexicographical_compare(this->range.begin(), this->range.end(), b.range.begin(), b.range.end());
+            }
+            //IF THEY HAVE DIFFERENT SIZES
+            return this->range.cardinality() < b.range.cardinality();
+        }
+
+        bool operator==(const RangeBitset<space>& other) const{
+
+            return this->range== other.range; //built in method of roaring class
+        }
+
+        int count() const{
+            return this->range.cardinality();
+        }
+        // When invoked returns a vector with all the subsets of this with this.count()-1 bits 
+        std::set<RangeRoaringBitmap<space>> subsets_of_size_minus_one() const{
+            std::set<RangeRoaringBitmap> subsets;
+            for (auto tid : this->range){
+                RangeRoaringBitmap<space> subset(this->range);
+                subset.remove(tid);
+                subsets.insert(subset);
+            }
+            return subsets;
+        }
+        //for debugging purposes
+        /*
+        
+        std::string to_string() const {
+
+            std::string s;
+            boost::to_string(this->range, s);
+            return s;
+
+        }
+        */
+
+        std::string to_string_readable() const{
+            std::string s  = "";
+            for (auto& tid : this->range){
+
+                s+= std::format("{} ", tid);
+
+            }
+            return s;
+
+        }
+
+    private:
+        void remove(id_t tid){
+            this->range.remove(tid);
+        }
+        roaring::Roaring range;
+
+
+};
 template <metric_space space>
 class vc_dim_extractor{
     private:
@@ -187,7 +270,7 @@ class vc_dim_extractor{
             if (!steps.converted_supports_to_bitsets){
 
                 for (auto& fp : algo.freq_pathlets){
-                    RangeSet<space> rb(dataset.num_trajectories_not_consecutive()+1, fp.supporting_trajectories); // Adding +1 to support datasets with ids starting both at 0 and at 1
+                    RangeRoaringBitmap<space> rb(dataset.num_trajectories_not_consecutive()+1, fp.supporting_trajectories); // Adding +1 to support datasets with ids starting both at 0 and at 1
                     set_of_supports.insert(rb);
 
                 }
@@ -204,7 +287,7 @@ class vc_dim_extractor{
 
                 }
                 
-            
+                
                 
                 steps.converted_supports_to_bitsets = true;
             }
@@ -214,7 +297,7 @@ class vc_dim_extractor{
         int compute_exact_vc_dimension(){
             assert(steps.converted_supports_to_bitsets && steps.computed_frequent_patterns);
             int max_shattered=  2;
-            std::set<RangeSet<space>> shattered_subsets;
+            std::set<RangeRoaringBitmap<space>> shattered_subsets;
             //initialize the shattered subsets
             for (const auto& s: set_of_supports){
                 if (s.count() ==1){
@@ -239,7 +322,7 @@ class vc_dim_extractor{
                     found_shattered = false;
                 }
                 //Enumerate subsets of s of size current_visiting size -1 and check if they are shattered.
-                std::set<RangeSet<space>> subsets = s.subsets_of_size_minus_one();
+                std::set<RangeRoaringBitmap<space>> subsets = s.subsets_of_size_minus_one();
                 bool s_shattered = true;
                 for (auto& smaller : subsets){
 
@@ -271,7 +354,7 @@ class vc_dim_extractor{
     };
     trajectory_t dataset;
     frequent_subtrajectory_algo_t algo;
-    std::set<RangeSet<space>> set_of_supports;
+    std::set<RangeRoaringBitmap<space>> set_of_supports;
     steps_taken steps;
     
 };
