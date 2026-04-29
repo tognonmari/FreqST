@@ -39,7 +39,9 @@ enum class sampling_mode {
     minimum_rough_vc = 6,
     minimum_rough_vc_no_erase = 7,
     vc_no_erase = 8,
-    intersection_vc_no_erase = 9 
+    intersection_vc_no_erase = 9,
+    pathlets_vc = 10,
+    intersection_pathlets_vc = 11
 };
 
 int main(int argc, char** argv){
@@ -111,7 +113,7 @@ int main(int argc, char** argv){
         pathletsfilename = infilename;
     }
 
-    if (mode == sampling_mode::intersection_vc || mode== sampling_mode::minimum_rough_vc || mode == sampling_mode::minimum_rough_vc_no_erase ){
+    if (mode == sampling_mode::intersection_vc || mode== sampling_mode::minimum_rough_vc || mode == sampling_mode::minimum_rough_vc_no_erase || mode== sampling_mode::intersection_pathlets_vc ){
         thorough = true;
     }
     trajectory_t pathlets = read_trajectory_from_file<space>(pathletsfilename);
@@ -193,6 +195,24 @@ int main(int argc, char** argv){
         case sampling_mode::minimum_rough_vc_no_erase:{
             auto start = chrono::high_resolution_clock::now();
             sampler.generate_rough_vc_no_erase_sample();
+            auto end = chrono::high_resolution_clock::now();
+            auto duration = duration_cast<chrono::milliseconds>(end - start);
+            std::cout << "TIME: "<<duration.count() << std::endl;
+            //sampler.dump_sample_to_file(std::format("{}/roughvc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
+            break;
+        }
+        case sampling_mode::pathlets_vc:{
+            auto start = chrono::high_resolution_clock::now();
+            sampler.generate_pathlets_vc_dim_sample();
+            auto end = chrono::high_resolution_clock::now();
+            auto duration = duration_cast<chrono::milliseconds>(end - start);
+            std::cout << "TIME: "<<duration.count() << std::endl;
+            //sampler.dump_sample_to_file(std::format("{}/roughvc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
+            break;
+        }
+        case sampling_mode::intersection_pathlets_vc:{
+            auto start = chrono::high_resolution_clock::now();
+            sampler.generate_pathlets_vc_dim_sample();
             auto end = chrono::high_resolution_clock::now();
             auto duration = duration_cast<chrono::milliseconds>(end - start);
             std::cout << "TIME: "<<duration.count() << std::endl;

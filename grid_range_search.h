@@ -5,7 +5,7 @@
 #include <iterator>
 #include <type_traits>
 #include <vector>
-
+#include <ranges>
 #include <CGAL/Dimension.h>
 #include <CGAL/Fuzzy_sphere.h>
 #include <CGAL/Classification/Planimetric_grid.h>
@@ -30,6 +30,7 @@ class grid_range_search{
         using space = m_space;
         using trajectory_t = trajectory_collection<space>;
         using index_t = trajectory_t::index_t;
+        using grid_t = LowDimensionalGrid<space, index_t>;
     
         
     private: 
@@ -41,15 +42,14 @@ class grid_range_search{
         using search_trait_base = space::search_traits;
         using search_traits = CGAL::Search_traits_adapter<typename property_map_t::key_type, property_map_t, search_trait_base>;
         using grid_range_t = std::vector<index_t>; 
-        using grid_t = LowDimensionalGrid<space, index_t>;
         using point_id_t = grid_t::point_id_t;
         using manual_map_t = std::map<point_id_t, point_t>; // I need this map to be able to erase pts out of range
     public:
         
         using result_t = std::vector<typename property_map_t::key_type>;
-        
+        using intermediate_result_t = std::array<std::map<point_id_t, std::vector<point_t>>, 2>;
         grid_range_search(const trajectory_t& trajectory, distance_t  grid_side) : point_map(trajectory), 
-                                                                            grid(grid_side, trajectory[0]) {
+                                                                            grid(grid_side, trajectory[0]), inserting_trajectories_not_pathlets(false) {
             for (index_t i =0; i< trajectory.total_size(); i++){
 
                 grid.insert(i, trajectory[i]);
@@ -57,8 +57,24 @@ class grid_range_search{
             } 
 
         }
+        grid_range_search(const trajectory_t& trajectory, distance_t  grid_side, bool inserting_trajectories_not_pathlets) : point_map(trajectory), 
+                                                                            grid(grid_side, trajectory[0], inserting_trajectories_not_pathlets), inserting_trajectories_not_pathlets(inserting_trajectories_not_pathlets) {
+            for (index_t i =0; i< trajectory.total_size(); i++){
 
-        grid_range_search(const point_t center_point, distance_t grid_side) : point_map(manual_map_t{}),grid(grid_side, center_point){
+                grid.insert(trajectory.get_id_at(i), trajectory[i]);
+
+            } 
+
+        }
+
+        grid_range_search(const point_t center_point, distance_t grid_side, bool inserting_trajectories_not_pathlets) : point_map(manual_map_t{}),grid(grid_side, center_point), inserting_trajectories_not_pathlets(inserting_trajectories_not_pathlets) {
+
+            manual_map_t new_map; // I need this map to be able to erase pts out of range 
+            point_map = new_map;
+
+        }
+
+        grid_range_search(const point_t center_point, distance_t grid_side) : point_map(manual_map_t{}),grid(grid_side, center_point), inserting_trajectories_not_pathlets(false) {
 
             manual_map_t new_map; // I need this map to be able to erase pts out of range 
             point_map = new_map;
@@ -78,28 +94,41 @@ class grid_range_search{
         result_t search(point_t point, distance_t squared_distance){
             
             auto search_distance_unsquared = std::sqrt(squared_distance);
-            std::array<result_t, 2> points_in_hypercube;
+            intermediate_result_t points_in_hypercube;
             //retrieve cell content
             points_in_hypercube = grid.search(point,search_distance_unsquared);
             //delete points out of range
-            erase_points_out_of_range(points_in_hypercube[1], point, squared_distance);
-            points_in_hypercube[0].insert(points_in_hypercube[0].end(), points_in_hypercube[1].begin(), points_in_hypercube[1].end());
-            return points_in_hypercube[0];
+            if(inserting_trajectories_not_pathlets){
+                erase_trajectories_out_of_range(points_in_hypercube[1], point, squared_distance);
+            }
+            else{
+                
+                erase_points_out_of_range(points_in_hypercube[1], point, squared_distance);
+
+            }
+            std::for_each(points_in_hypercube[1].begin(), points_in_hypercube[1].end(), [&](const auto& kv_pair) {points_in_hypercube[0].try_emplace(kv_pair.first);});
+            //points_in_hypercube[0].insert(points_in_hypercube[0].end(), points_in_hypercube[1].begin(), points_in_hypercube[1].end());
+            auto keys = points_in_hypercube[0] | std::views::keys;
+            result_t result(keys.begin(), keys.end());
+            return result;
+            //return points_in_hypercube[0];
             
 
         }
         result_t search_no_erase(point_t point, distance_t squared_distance){
             
             auto search_distance_unsquared = std::sqrt(squared_distance);
-            std::array<result_t, 2> points_in_hypercube;
+            intermediate_result_t points_in_hypercube;
             //retrieve cell content
             points_in_hypercube = grid.search(point,search_distance_unsquared);
             //DO NOT delete points out of range
             //erase_points_out_of_range(points_in_hypercube[1], index, squared_distance);
-            points_in_hypercube[0].insert(points_in_hypercube[0].end(), points_in_hypercube[1].begin(), points_in_hypercube[1].end());
-            return points_in_hypercube[0];
-            
-
+            //points_in_hypercube[0].insert(points_in_hypercube[0].end(), points_in_hypercube[1].begin(), points_in_hypercube[1].end());
+            std::for_each(points_in_hypercube[1].begin(), points_in_hypercube[1].end(), [&](const auto& kv_pair) {points_in_hypercube[0].try_emplace(kv_pair.first);});
+            //return points_in_hypercube[0].keys();
+            auto keys = points_in_hypercube[0] | std::views::keys;
+            result_t result(keys.begin(), keys.end());
+            return result;
         }
         
         grid_t& get_grid() {
@@ -121,6 +150,7 @@ class grid_range_search{
     private:
         std::variant<manual_map_t, property_map_t> point_map; //reference to the original trajectory
         grid_t grid;
+        const bool inserting_trajectories_not_pathlets;
         //Retrieve point either from map or adapter
         point_t get_point(point_id_t id){
 
@@ -129,9 +159,21 @@ class grid_range_search{
         }
 
         //Search results clean up
-        void erase_points_out_of_range(result_t &points, point_t center, distance_t distance) {
-            std::erase_if(points, [this, center, distance](const index_t p) {
-                return distance_function_t()(get_point(p), center) > distance;
+        void erase_points_out_of_range(std::map<point_id_t, std::vector<point_t>>& map, point_t center, distance_t distance) {
+            std::erase_if(map, [this, center, distance](const auto& kv) {
+                return distance_function_t()(get_point(kv.first), center) > distance;
+            });
+        }
+
+        void erase_trajectories_out_of_range(std::map<point_id_t, std::vector<point_t>>& map, point_t center, distance_t distance) {
+            for (auto& pair : map){
+                std::erase_if(pair.second, [this, center, distance, pair](const point_t p) {
+                    return distance_function_t()(p, center) > distance;
+                });
+            }
+            
+            std::erase_if(map, [](const auto& kv) {
+                return kv.second.empty();   
             });
         }
 
