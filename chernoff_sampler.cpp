@@ -129,7 +129,7 @@ int main(int argc, char** argv){
     switch(mode){
         case sampling_mode::fixed_size:{
             sampler.generate_fixed_size_sample(fixed_size);
-            //sampler.dump_sample_to_file(std::format("{}/fixedsize_{}_{}.txt", outfiledir, fixed_size, seed));
+            sampler.dump_sample_to_file(std::format("{}/fixedsize_{}_{}.txt", outfiledir, fixed_size, seed));
             break;
         }
         case sampling_mode::chernoff:{

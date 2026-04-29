@@ -940,11 +940,13 @@ class freq_subtrajectory_sampler{
                 }
                 std::sort(counters.begin(), counters.end(), std::greater<>());
                 float mean = std::reduce(counters.begin(), counters.end()) / ((float)(counters.size()));
-                std::cout << "=====================\n";
+                float empirical_variance = std::transform_reduce(counters.begin(), counters.end(), 0.0, std::plus<>(), [&](int x) {return (x-mean)*(x-mean);})/ ((float)(counters.size()-1));
+                std::cout << "********************************\n";
                 std::cout << std::format("TRANSACTION : {}\n", pair.traj_id);
                 std::cout << std::format("NUMBER OF REPORTED POINTS : {}\n", replica.size());
                 std::cout << std::format("AVERAGE NUMBER OF REPETITIONS : {}\n", mean);
-                std::cout << std::format("TOP 3 NUMBER OF REPETITIONS : {}, {}, {}\n", counters.at(0), counters.at(1), counters.at(2) );
+
+                std::cout << std::format("TOP 5 NUMBER OF REPETITIONS : {}, {}, {}, {}, {}\n", counters.at(0), counters.at(1), counters.at(2), counters.at(3), counters.at(4) );
 
             }
 
