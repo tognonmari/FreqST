@@ -9,7 +9,8 @@ template<frechet::CGAL_metric_space_concept space, typename point_identifier_t> 
 class LowDimensionalGrid{
 
     public: //exposed types
-        using result_t = std::vector<point_identifier_t>;
+        using point_t = space::point_t;
+        using result_t = std::map<point_identifier_t, std::vector<point_t>>;//std::vector<point_identifier_t>;
         using point_id_t = point_identifier_t;
         template<std::size_t D>
         struct CellKey{ 
@@ -53,26 +54,32 @@ class LowDimensionalGrid{
         };
     private:
         using kernel = space::kernel;
-        using point_t = space::point_t;
         using distance_function_t = space::distance_function_t;
         using distance_t = space::distance_function_t::distance_t;
-        using cell_content_t =std::vector<point_identifier_t>;
+        using cell_content_t =std::map<point_identifier_t, std::vector<point_t>>;
         static constexpr std::size_t dimension = space::dimension::value;
         using vector_t = std::conditional_t<(dimension==2), typename kernel::Vector_2, std::conditional_t<(dimension==3), typename kernel::Vector_3, void>>;
 
 
         
     public: 
-        LowDimensionalGrid(distance_t grid_side, const point_t origin_point) : grid_side(grid_side), origin_point(origin_point) {
+        LowDimensionalGrid(distance_t grid_side, const point_t origin_point) : grid_side(grid_side), origin_point(origin_point), point_memorization(false) {
 
 
         }
-        //WON'T CHECK FOR ID DuPLICATES
+        LowDimensionalGrid(distance_t grid_side, const point_t origin_point, bool point_memorization) : grid_side(grid_side), origin_point(origin_point), point_memorization(point_memorization) {
+
+        }
+        //WON'T CHECK FOR ID DuPLICATES if using a vector
         void insert(point_identifier_t id, const point_t& point){
 
             CellKey<dimension> key = compute_cell_key(point);
-
-            grid[key].push_back(id);
+            if(! point_memorization){
+                grid[key][id];
+            }
+            else{
+                grid[key][id].push_back(point);
+            }
 
         }
 
@@ -126,7 +133,7 @@ class LowDimensionalGrid{
         std::map<CellKey<dimension>, cell_content_t> grid;
         const point_t origin_point;
         const double grid_side;
-
+        const bool point_memorization;
         //Verify whether the cell can have any intersection with the ball, then add points if some intersection exists
         void query_cell(CellKey<dimension>& cell, point_t& center, distance_t radius, std::array<result_t,2>& output){
             //Assert the cell is not empty (i.e. assert it exists in the map)
@@ -154,11 +161,15 @@ class LowDimensionalGrid{
             }
 
             if(all_included){
-
-                output[0].insert(output[0].end(),grid[cell].begin(), grid[cell].end());
+                for (auto& pair : grid[cell]){
+                    output[0][pair.first].insert(output[0][pair.first].end(), pair.second.begin(), pair.second.end());
+                }
+                //output[0].insert(output[0].end(),grid[cell].begin(), grid[cell].end());
             }
             else if (partial_intersection){
-                output[1].insert(output[1].end(), grid[cell].begin(), grid[cell].end());
+                for (auto& pair : grid[cell]){
+                    output[1][pair.first].insert(output[1][pair.first].end(), pair.second.begin(), pair.second.end());
+                }
             }
             return;
             //std::cout << "Cell "<< cell.to_string() <<" doesn't intersect the range."<<std::endl;
@@ -255,8 +266,8 @@ class LowDimensionalGrid{
 
         static std::string get_points_id_string(cell_content_t& list){
             std::string s = " ";
-            for (auto& idd : list){
-                s += std::to_string(idd);
+            for (auto& kv_pair : list){
+                s += std::to_string(kv_pair.first);
                 s += " ";
             }
 
