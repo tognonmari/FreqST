@@ -824,12 +824,22 @@ class freq_subtrajectory_sampler{
                     }
 
                 }
+                /*
+                
                 if( thorough && min_length >=3){
                     c.push_back(floor(log2(std::count_if(traj_set.begin(), traj_set.end(), [&](const auto& x){ return traj_set_ends.contains(x); })) + 1));
 
                 }
                 else{
                     c.push_back(floor(log2(traj_set.size()) + 1));
+                }
+                */
+               if( thorough && min_length >=3){
+                    c.push_back(std::count_if(traj_set.begin(), traj_set.end(), [&](const auto& x){ return traj_set_ends.contains(x); }) + 1);
+
+                }
+                else{
+                    c.push_back(traj_set.size());
                 }
                 
             }
@@ -842,7 +852,9 @@ class freq_subtrajectory_sampler{
 
             //}
 
-            int vc_dim = 0;
+            int vc_dim = 1;
+
+            /*
             
             for(int i = 0 ; i < c.size(); i++){
 
@@ -853,8 +865,26 @@ class freq_subtrajectory_sampler{
                 }
 
             }
-            std::cout <<"VC DIM ESTIMATE IS "<< vc_dim <<"\n";
-            return vc_dim;
+            
+            */
+            while(true){
+                int reserved_pathlets = 0;
+                for (int j = 0; j<vc_dim; j++)
+                {   
+                    for (auto it=c.begin(); it!=c.begin() +reserved_pathlets+binom(vc_dim, j); it++){
+                        int c_val = *it;
+                        if (c_val< vc_dim -j){
+                            std::cout <<"VC DIM ESTIMATE IS "<< vc_dim <<"\n";
+                            return vc_dim;
+                        }
+                    }
+                    
+                    reserved_pathlets += binom(vc_dim, j);
+
+                }
+                //std::cout<< "Passed test for vc_dim "<< vc_dim<<std::endl;
+                vc_dim++;
+            }
         }
         int pathlets_vc_dim_no_erase(){
             //TODO
@@ -1160,7 +1190,14 @@ class freq_subtrajectory_sampler{
 
             return;
         }
-
+        static long long binom(int n, int k) {
+            if (k > n - k) k = n - k;
+            long long res = 1;
+            for (int i = 0; i < k; ++i) {
+                res = res * (n - i) / (i + 1);
+            }
+            return res;
+        }
     std::mt19937 mt;
     std::map<index_t, point_t> pathlet_beginnings;
     std::map<index_t, point_t> pathlet_ends;
