@@ -23,7 +23,7 @@ using frequent_subtrajectory_algo_t = frequent_subtrajectory_algo<space>;
 using trajectory_t = trajectory_collection<space>;
 using distance_function_t = space::distance_function_t;
 using distance_t = distance_function_t::distance_t; 
-using range_search_t = kd_tree_range_search<space>;
+using range_search_t = kd_tree_range_search<space>; 
 
 int main(int argc, char** argv){
 
