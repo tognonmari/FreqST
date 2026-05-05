@@ -365,11 +365,13 @@ class RangeRoaringBitmap{
         void remove(id_t tid){
             this->range.remove(tid);
         }
+        //Risky bit
+        roaring::Roaring range;
     private:
 
         
 
-        roaring::Roaring range;
+        
         id_t roaring_bitmap_id;
         id_t last_added;
 
@@ -573,31 +575,37 @@ class vc_dim_extractor{
 
             // Extract elements from Roaring bitmap
             roaring::Roaring trajectory_ids = candidate.get_range();
-            roaring::Roaring filtered_ranges;
+            //roaring::Roaring filtered_ranges;
             //std::cout<< std::format("--------------checking shattering for set {}\n", candidate.to_string());
             for (auto it = trajectory_ids.begin(); it != trajectory_ids.end(); ++it) {
                 elems.push_back(*it);
-                filtered_ranges |= inverted_index[*it];
+                //filtered_ranges |= inverted_index[*it];
             }
 
             int n = elems.size();
-            std::set<RangeRoaringBitmap<space>> cached_ranges; //Not employable 
 
             // Iterate over all non-empty subsets
             for (uint64_t mask = 1; mask < (1ULL << n); ++mask) {
+                
                 RangeRoaringBitmap<space> subset(std::set<id_t>{});
                 for (int i = 0; i < n; ++i) {
                     if (mask & (1ULL << i)) {
                         subset.add(elems[i]);
+                        
                     }
+                }
+                roaring::Roaring aggressively_filtered_ranges(inverted_index[*(subset.get_range().begin())]);
+                for (const auto idd : subset.get_range()){
+
+                    aggressively_filtered_ranges &= inverted_index[*(subset.get_range().begin())];
                 }
                 //std::cout << std::format("I am searching for a support for set {} while trying to shatter set {}\n", subset.to_string(), candidate.to_string());
                 bool found_a_range = false;
                 
                 //Check it is shattered
-                for (const auto& range_idx : filtered_ranges){
+                for (const auto& range_idx : aggressively_filtered_ranges){
                     
-                    if((candidate & ranges[range_idx] )== subset){
+                    if((candidate.range & ranges[range_idx].range )== subset.range){
                         //std::cout << std::format("Subset {} and range {} have intersection {}\n", subset.to_string(), range.to_string(), (subset & range ).to_string());
                         found_a_range = true;
                         break;
