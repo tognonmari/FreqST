@@ -1,5 +1,6 @@
 #include "freq_st_algo.h"
 #include <bitset>
+#include <chrono>
 #include <boost/dynamic_bitset.hpp>
 #include "roaring.hh"
 #include <omp.h>
@@ -474,7 +475,7 @@ class vc_dim_extractor{
                 prefix.remove(item);
             }
         };
-        static void generate_candidates(const Trie& trie, int target_k, std::vector<RangeRoaringBitmap<space>>& candidates,const std::vector<RangeRoaringBitmap<space>>& set_of_supports,const std::vector<roaring::Roaring>& inverted_index){
+        static void generate_candidates(const Trie& trie, int target_k, std::vector<RangeRoaringBitmap<space>>& candidates,const std::vector<RangeRoaringBitmap<space>>& set_of_supports,const std::vector<roaring::Roaring>& inverted_index, int threads){
 
             std::vector<RangeRoaringBitmap<space>> global_candidates;
             std::vector<typename TrieNode::children_map_t::iterator> children_to_explore;
@@ -483,13 +484,14 @@ class vc_dim_extractor{
                 children_to_explore.push_back(it);
             }
             int global_generations = 0;
-            #pragma omp parallel num_threads(13)
+            #pragma omp parallel num_threads(threads)
             {
                 std::vector<RangeRoaringBitmap<space>> local_candidates;
                 std::vector<RangeRoaringBitmap<space>> temporary_candidates;
                 int local_generations = 0;
                 #pragma omp for schedule(dynamic,1)
                 for (int i = 0; i< children_to_explore.size(); i++){
+                    
                     auto& [key, value] = *(children_to_explore[i]);
                     RangeRoaringBitmap<space> prefix(std::set<id_t>{});
                     prefix.add(key);
@@ -543,9 +545,6 @@ class vc_dim_extractor{
                         }
                     }
                     temporary_candidates.clear();
-                    
-                    //std::cout<< "Generated candidates with 1 beginnings \n";
-
                 }
 
                 #pragma omp critical
@@ -621,7 +620,7 @@ class vc_dim_extractor{
             //std::cout<<std::format("Set {} is shattered.\n", candidate.to_string());
             return true;
         };
-        static void generate_pairs_by_enumeration(Trie& T_2, std::map<RangeRoaringBitmap<space>, transaction_set_data>& F_2,std::map<RangeRoaringBitmap<space>, transaction_set_data>& F_1,std::vector<roaring::Roaring> inverted_index){
+        static void generate_pairs_by_enumeration(Trie& T_2, std::map<RangeRoaringBitmap<space>, transaction_set_data>& F_2,std::map<RangeRoaringBitmap<space>, transaction_set_data>& F_1,std::vector<roaring::Roaring> inverted_index, int threads){
 
             //Trivial generation of F_2 by enumeration
             //Bag all the non pruned trajectories
@@ -629,7 +628,7 @@ class vc_dim_extractor{
             for (const auto& [key, data] : F_1){
                 tids.push_back(*(key.get_range().begin()));
             }
-            #pragma omp parallel num_threads(13)
+            #pragma omp parallel num_threads(threads)
             {
                 std::map<RangeRoaringBitmap<space>, transaction_set_data> local_F_2;
                 #pragma omp for schedule(dynamic, 8) 
@@ -665,8 +664,8 @@ class vc_dim_extractor{
                 }
             }
         };
-        static void generate_pairs_from_supports(Trie& T_2, std::map<RangeRoaringBitmap<space>, transaction_set_data>& F_2,const std::vector<RangeRoaringBitmap<space>>& set_of_supports, const std::vector<roaring::Roaring>& inverted_index){
-            #pragma omp parallel num_threads(13)
+        static void generate_pairs_from_supports(Trie& T_2, std::map<RangeRoaringBitmap<space>, transaction_set_data>& F_2,const std::vector<RangeRoaringBitmap<space>>& set_of_supports, const std::vector<roaring::Roaring>& inverted_index, int threads){
+            #pragma omp parallel num_threads(threads)
             {
                 int tid = omp_get_thread_num();
                 int nthreads = omp_get_num_threads();
@@ -731,7 +730,7 @@ class vc_dim_extractor{
         using distance_t = distance_function_t::distance_t;
         using range_search_t = kd_tree_range_search<space>;
         //takes same arguments as freqstalgo, as it needs to initialize it
-        vc_dim_extractor(trajectory_t& sampled_traj, range_search_t& search, std::string dataset_file, distance_t distance_thresh):algo(sampled_traj,search, dataset_file,0.0,distance_thresh,output_config){
+        vc_dim_extractor(trajectory_t& sampled_traj, range_search_t& search, std::string dataset_file, distance_t distance_thresh, int threads):algo(sampled_traj,search, dataset_file,0.0,distance_thresh,output_config), threads(threads){
             this->dataset = sampled_traj;
         }
 
@@ -861,17 +860,20 @@ class vc_dim_extractor{
             }
 
             T.push_back(Trie());
+            auto start = std::chrono::high_resolution_clock::now();
             //Fill up F_2 with the appearing pairs.
             if(effective_pairs< possible_pairs){
                 
-                generate_pairs_from_supports(T[2], F[2], set_of_supports, inverted_index);
+                generate_pairs_from_supports(T[2], F[2], set_of_supports, inverted_index, threads);
             }
             else{
-                generate_pairs_by_enumeration(T[2], F[2], F[1], inverted_index);
+                generate_pairs_by_enumeration(T[2], F[2], F[1], inverted_index, threads);
             }
             
-            
+            auto end = std::chrono::high_resolution_clock::now();
             std::cout << "Number of elements of F_2 is "<<F[2].size()<< std::endl;
+            auto duration = duration_cast<std::chrono::milliseconds>(end - start);
+            std::cout << std::format("It took {} ms to generate the pairs with {} threads\n", duration.count(), threads);
             //for(const auto& [key, data] : F[2]){
             //    std::cout << std::format("Pair {} belongs to F[2]\n", key.to_string());
             //}
@@ -881,8 +883,11 @@ class vc_dim_extractor{
                 T.push_back(Trie());
                 std::vector<RangeRoaringBitmap<space>> candidates;
                 RangeRoaringBitmap<space> prefix(std::set<id_t>{});
-
-                generate_candidates(T[k-1],  k, candidates, set_of_supports, inverted_index);
+                start = std::chrono::high_resolution_clock::now();
+                generate_candidates(T[k-1],  k, candidates, set_of_supports, inverted_index, threads);
+                end = std::chrono::high_resolution_clock::now();
+                duration = duration_cast<std::chrono::milliseconds>(end - start);
+                std::cout << std::format("It took {} ms to generate the {}-ples with {} threads.\n", duration.count(), k, threads);
                 //std::sort(candidates.begin(), candidates.end());
                 //std::cout << "VECTOR CANDIDATES: \n";
                 //for (const auto& c : candidates){
@@ -890,11 +895,15 @@ class vc_dim_extractor{
                 //}
                 //I already check all subsets are present in the candidate generation phase. 
                 int insertions = candidates.size();
+                start = std::chrono::high_resolution_clock::now();
                 for (const auto c: candidates){
 
                     T[k].insert(c);
 
                 }
+                end = std::chrono::high_resolution_clock::now();
+                duration = duration_cast<std::chrono::milliseconds>(end - start);
+                std::cout << std::format("It took {} ms to populate T[{}]. \n", duration.count(), k);
                 if(insertions==0){
                     std::cout<< std::format("I could not fill the trie at size {}, so we break the apriori-like cycle.\n",k);
                     
@@ -917,6 +926,7 @@ class vc_dim_extractor{
     frequent_subtrajectory_algo_t algo;
     std::vector<RangeRoaringBitmap<space>> set_of_supports;
     steps_taken steps;
+    int threads;
     
 };
 

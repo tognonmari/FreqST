@@ -32,6 +32,7 @@ int main(int argc, char** argv){
     distance_t radius;  
     float frequency_threshold, epsilon, delta;
     int minimum_length = 1;
+    int threads = 2;
     std::string infilename, outfilename, pathlet_file_name;
 
     //Step 2: parse the input parameters
@@ -45,6 +46,10 @@ int main(int argc, char** argv){
                    infilename,
                    "The file with the dataset.")
                     ->required();
+    app.add_option("-t,--threads",
+                   threads,
+                   "The number of threads for the computation-heavy part. ")
+                   ->required();
 
     CLI11_PARSE(app, argc, argv);   
 
@@ -54,7 +59,7 @@ int main(int argc, char** argv){
     
     range_search_t rs(dataset);
     
-    vc_dim_extractor<space> extractor(dataset, rs, infilename, radius);
+    vc_dim_extractor<space> extractor(dataset, rs, infilename, radius, threads);
 
     extractor.compute_set_of_supports();
     std::cout << "Finished computing set of supports \n";
