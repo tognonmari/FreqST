@@ -488,7 +488,7 @@ class vc_dim_extractor{
                 std::vector<RangeRoaringBitmap<space>> local_candidates;
                 std::vector<RangeRoaringBitmap<space>> temporary_candidates;
                 int local_generations = 0;
-                #pragma omp for schedule(dynamic, 5)
+                #pragma omp for schedule(dynamic,1)
                 for (int i = 0; i< children_to_explore.size(); i++){
                     auto& [key, value] = *(children_to_explore[i]);
                     RangeRoaringBitmap<space> prefix(std::set<id_t>{});
@@ -543,6 +543,8 @@ class vc_dim_extractor{
                         }
                     }
                     temporary_candidates.clear();
+                    
+                    //std::cout<< "Generated candidates with 1 beginnings \n";
 
                 }
 
