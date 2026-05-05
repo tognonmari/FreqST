@@ -267,6 +267,12 @@ class RangeRoaringBitmap{
 
             return this->roaring_bitmap_id;
         }
+
+        void set_range_id(id_t range_id) {
+
+            this->roaring_bitmap_id = range_id;
+
+        }
         // When invoked returns a vector with all the subsets of this with this.count()-1 bits 
         std::set<RangeRoaringBitmap<space>> subsets_of_size_minus_one() const{
             std::set<RangeRoaringBitmap> subsets;
@@ -435,7 +441,6 @@ class vc_dim_extractor{
             return true;
 
         }
-
         static void generate_candidates_recursive(TrieNode* node, RangeRoaringBitmap<space>& prefix,int target_k,const Trie& trie,std::vector<RangeRoaringBitmap<space>>& candidates) {
             // If we're at depth k-1 we generate size k candidates
             if ((int)prefix.count() == target_k - 2) {
@@ -529,7 +534,7 @@ class vc_dim_extractor{
                             //std::cout << std::format("Set {} and its subset always share the same support, so I don't add the first set to T[{}]\n", c.to_string(), k);
                             continue;
                         }
-                        if(!a_subset_cant_be_separated_from_c && is_shattered(c,set_of_supports)){
+                        if(!a_subset_cant_be_separated_from_c && is_shattered(c,set_of_supports, inverted_index)){
                             //std::cout << std::format("inserting the {}-ple {} into the Trie, as the trajectories' intersection is {}\n",k, c.to_string(), intersection.to_string());
                             local_candidates.push_back(c);
                             
@@ -561,20 +566,23 @@ class vc_dim_extractor{
             candidates = std::move(global_candidates);
             std::cout<< std::format("I have generated {} candidates of size {}, but due to lack of supports I am adding {}.\n", global_generations,target_k,candidates.size());
         }
-        static bool is_shattered(const RangeRoaringBitmap<space>& candidate, const std::vector<RangeRoaringBitmap<space>>& ranges){
+        static bool is_shattered(const RangeRoaringBitmap<space>& candidate, const std::vector<RangeRoaringBitmap<space>>& ranges, const std::vector<roaring::Roaring>& inverted_index){
 
             std::vector<id_t> elems;
             elems.reserve(candidate.count());
 
             // Extract elements from Roaring bitmap
             roaring::Roaring trajectory_ids = candidate.get_range();
+            roaring::Roaring filtered_ranges;
             //std::cout<< std::format("--------------checking shattering for set {}\n", candidate.to_string());
             for (auto it = trajectory_ids.begin(); it != trajectory_ids.end(); ++it) {
                 elems.push_back(*it);
+                filtered_ranges |= inverted_index[*it];
             }
 
             int n = elems.size();
             std::set<RangeRoaringBitmap<space>> cached_ranges; //Not employable 
+
             // Iterate over all non-empty subsets
             for (uint64_t mask = 1; mask < (1ULL << n); ++mask) {
                 RangeRoaringBitmap<space> subset(std::set<id_t>{});
@@ -585,9 +593,11 @@ class vc_dim_extractor{
                 }
                 //std::cout << std::format("I am searching for a support for set {} while trying to shatter set {}\n", subset.to_string(), candidate.to_string());
                 bool found_a_range = false;
+                
                 //Check it is shattered
-                for (const auto& range : ranges){
-                    if((candidate & range )== subset){
+                for (const auto& range_idx : filtered_ranges){
+                    
+                    if((candidate & ranges[range_idx] )== subset){
                         //std::cout << std::format("Subset {} and range {} have intersection {}\n", subset.to_string(), range.to_string(), (subset & range ).to_string());
                         found_a_range = true;
                         break;
@@ -750,7 +760,7 @@ class vc_dim_extractor{
                     if (current_visiting_size != s.count()){
                     
                         current_visiting_size = s.count();
-                        std::cout << std::format("I have {} supports of size {}\n", count, current_visiting_size-1);
+                        //std::cout << std::format("I have {} supports of size {}\n", count, current_visiting_size-1);
                         count = 0;
                     }
                     count++;
@@ -760,8 +770,13 @@ class vc_dim_extractor{
                 //set becomes a vector for parallelization later on 
                 std::vector<RangeRoaringBitmap<space>> supports_vec(temporary_set_of_supports.begin(),temporary_set_of_supports.end());
                 set_of_supports = supports_vec;
-                std::cout << std::format("I have {} supports of size {}\n", count, current_visiting_size);
-                
+                //std::cout << std::format("I have {} supports of size {}\n", count, current_visiting_size);
+                for(id_t j = 0; j <set_of_supports.size(); j++){
+
+                   set_of_supports[j].set_range_id(j);
+                    
+
+                }
                 steps.converted_supports_to_bitsets = true;
             }
 
