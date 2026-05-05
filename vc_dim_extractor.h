@@ -204,6 +204,7 @@ class RangeRoaringBitmap{
 
             }
         }
+        /*
         bool operator<(const RangeRoaringBitmap<space>& b) const {
             const auto ca = range.cardinality();
             const auto cb = b.range.cardinality();
@@ -218,6 +219,24 @@ class RangeRoaringBitmap{
                 return amin < bmin;
 
             return range.maximum() < b.range.maximum();
+        }
+        
+        */
+
+        
+        bool operator<(const RangeRoaringBitmap<space>& b) const {
+            if (range.cardinality() != b.range.cardinality())
+                return range.cardinality() < b.range.cardinality();
+
+            auto ita = range.begin();
+            auto itb = b.range.begin();
+
+            for (; ita != range.end() && itb != b.range.end(); ++ita, ++itb) {
+                if (*ita != *itb)
+                    return *ita < *itb;
+            }
+
+            return false;
         }
         /*
         
@@ -448,7 +467,7 @@ class vc_dim_extractor{
                 prefix.remove(item);
             }
         };
-        static void generate_candidates(const Trie& trie, int target_k, std::vector<RangeRoaringBitmap<space>>& candidates){
+        static void generate_candidates(const Trie& trie, int target_k, std::vector<RangeRoaringBitmap<space>>& candidates,const std::vector<RangeRoaringBitmap<space>>& set_of_supports,const std::vector<roaring::Roaring>& inverted_index){
 
             std::vector<RangeRoaringBitmap<space>> global_candidates;
             std::vector<typename TrieNode::children_map_t::iterator> children_to_explore;
@@ -456,27 +475,91 @@ class vc_dim_extractor{
             for (auto it = trie.root->children.begin(); it != trie.root->children.end(); ++it){
                 children_to_explore.push_back(it);
             }
-            #pragma omp parallel num_threads(6)
+            int global_generations = 0;
+            #pragma omp parallel num_threads(2)
             {
                 std::vector<RangeRoaringBitmap<space>> local_candidates;
-                #pragma omp for schedule(dynamic)
+                std::vector<RangeRoaringBitmap<space>> temporary_candidates;
+                int local_generations = 0;
+                #pragma omp for schedule(dynamic, 5)
                 for (int i = 0; i< children_to_explore.size(); i++){
                     auto& [key, value] = *(children_to_explore[i]);
                     RangeRoaringBitmap<space> prefix(std::set<id_t>{});
                     prefix.add(key);
 
-                    generate_candidates_recursive(value.get(), prefix, target_k, trie, local_candidates);
+                    generate_candidates_recursive(value.get(), prefix, target_k, trie, temporary_candidates);
+
+                    //TODO: check items inside temp candidates, append the shattered ones to local candidates and clean temporary_cand
+                    
+                    local_generations += temporary_candidates.size();
+                    
+                    for (int i = 0; i<temporary_candidates.size(); i++){
+                        auto c = temporary_candidates[i];
+                        
+                        RangeRoaringBitmap<space> intersection(inverted_index[*(c.get_range().begin())]);
+                        for (const auto tid: c.get_range()){
+                            intersection = intersection & inverted_index[tid];
+                            if(intersection.count() == 0){
+                                break;
+                            }
+                        }
+                        if(intersection.count() == 0){
+                            //std::cout << std::format("Set {} does not appear in any pattern, so I don't add it to T[{}]\n", c.to_string(), k);
+
+                            continue;
+                        }
+                        
+                        bool a_subset_cant_be_separated_from_c = false;
+                        
+                        //se l'intesezione ha la stessa cardinalità dei sottinsiemi di taglia -1 it means it is not shatterable, so I won't bother inserting it.
+                        for (const auto& subset: c.subsets_of_size_minus_one()){
+                            RangeRoaringBitmap<space> intersection_subset(inverted_index[*(subset.get_range().begin())]);
+                            for (const auto tid: subset.get_range()){
+                                intersection_subset = intersection_subset & inverted_index[tid];
+                            }
+                            if(intersection_subset.count() == intersection.count()){
+                                a_subset_cant_be_separated_from_c = true;
+                                
+                                break;
+                            }
+                            assert(intersection_subset.count()> intersection.count());
+
+                        }
+                        if(a_subset_cant_be_separated_from_c){
+                            //std::cout << std::format("Set {} and its subset always share the same support, so I don't add the first set to T[{}]\n", c.to_string(), k);
+                            continue;
+                        }
+                        if(!a_subset_cant_be_separated_from_c && is_shattered(c,set_of_supports)){
+                            //std::cout << std::format("inserting the {}-ple {} into the Trie, as the trajectories' intersection is {}\n",k, c.to_string(), intersection.to_string());
+                            local_candidates.push_back(c);
+                            
+                        }
+                    }
+                    temporary_candidates.clear();
+
                 }
 
                 #pragma omp critical
-                {
+                {   
                     global_candidates.insert(global_candidates.end(), local_candidates.begin(), local_candidates.end());
+                    global_generations += local_generations;
                 }
 
                 
             }
+            //std::set<RangeRoaringBitmap<space>> unique_set(global_candidates.begin(), global_candidates.end());
 
+            //std::cout << "Raw vector size: " << global_candidates.size() << "\n";
+            //std::cout << "Unique set size: " << unique_set.size() << "\n";
+            //std::cout << "Duplicates: " << (global_candidates.size() - unique_set.size()) << "\n";
+            //std::cout<<" SET CANDIDATES : \n";
+            //for (const auto c: unique_set){
+
+            //    std::cout << std::format("Candidate generated: {} \n", c.to_string());
+
+            //}
             candidates = std::move(global_candidates);
+            std::cout<< std::format("I have generated {} candidates of size {}, but due to lack of supports I am adding {}.\n", global_generations,target_k,candidates.size());
         }
         static bool is_shattered(const RangeRoaringBitmap<space>& candidate, const std::vector<RangeRoaringBitmap<space>>& ranges){
 
@@ -485,12 +568,13 @@ class vc_dim_extractor{
 
             // Extract elements from Roaring bitmap
             roaring::Roaring trajectory_ids = candidate.get_range();
+            //std::cout<< std::format("--------------checking shattering for set {}\n", candidate.to_string());
             for (auto it = trajectory_ids.begin(); it != trajectory_ids.end(); ++it) {
                 elems.push_back(*it);
             }
 
             int n = elems.size();
-
+            std::set<RangeRoaringBitmap<space>> cached_ranges; //Not employable 
             // Iterate over all non-empty subsets
             for (uint64_t mask = 1; mask < (1ULL << n); ++mask) {
                 RangeRoaringBitmap<space> subset(std::set<id_t>{});
@@ -510,6 +594,7 @@ class vc_dim_extractor{
                     }
                 }
                 if( !found_a_range){
+                    //std::cout<< std::format("Set {} is not shattered because no range containing {} has intersection {} with {}. OUTPUTFALSE\n", candidate.to_string(), subset.to_string(), subset.to_string(), candidate.to_string());
                     return false;
                 }
             }
@@ -524,7 +609,7 @@ class vc_dim_extractor{
             for (const auto& [key, data] : F_1){
                 tids.push_back(*(key.get_range().begin()));
             }
-            #pragma omp parallel num_threads(6)
+            #pragma omp parallel num_threads(2)
             {
                 std::map<RangeRoaringBitmap<space>, transaction_set_data> local_F_2;
                 #pragma omp for schedule(dynamic, 8) 
@@ -561,7 +646,7 @@ class vc_dim_extractor{
             }
         };
         static void generate_pairs_from_supports(Trie& T_2, std::map<RangeRoaringBitmap<space>, transaction_set_data>& F_2,const std::vector<RangeRoaringBitmap<space>>& set_of_supports, const std::vector<roaring::Roaring>& inverted_index){
-            #pragma omp parallel num_threads(6)
+            #pragma omp parallel num_threads(2)
             {
                 int tid = omp_get_thread_num();
                 int nthreads = omp_get_num_threads();
@@ -613,54 +698,7 @@ class vc_dim_extractor{
             }
             
 
-            /*
-            
-            //Building F_2 from the actually appearing pairs. 
-            int iter = 1;
-            for (const auto& s : set_of_supports){
-                //std::cout << std::format("I  am looking at support set for a pathlet whose id is {}, which appears in trajectories {}\n",s.get_range_id(), s.to_string());
-                iter++;
-                if(iter%1000==0){
-                    std::cout<< std::format("Examining support set {}/{}...\n", iter, set_of_supports.size()); 
-                }
-                std::vector<id_t> tids;
-                for (auto tid : s.get_range()){
-                    //std::cout << "-> I am pushing into the vector the trajectory id "<< tid <<std::endl;
-                    tids.push_back(tid);
-                }
 
-                for (int i = 0; i< tids.size(); i++){
-
-                    for (int j = i+1; j< tids.size(); j++){
-                        
-                        RangeRoaringBitmap<space> key(std::set<id_t>{tids[i], tids[j]});
-
-                        //std::cout << "My key is "<< key.to_string()<< std::endl;
-                        //std::cout << "Key0s cardinality is "<< key.count()<< "while it should be 2 \n";
-                        auto [it, inserted] = F[2].try_emplace(key);
-                        auto& value = it->second;
-                        value.generator_sets++;
-                        value.shattered = true;
-                        //F[2][key].generator_sets++;
-                        
-                        roaring::Roaring intersection = inverted_index[tids[i]] & inverted_index[tids[j]];
-                        //std::cout << std::format("Intersection of common pathlets for trajectories {} and {} is {}\n", tids[i], tids[j], RangeRoaringBitmap<space>(intersection).to_string() );
-                        value.max_cardinality_of_shattered_superset = floor(log2((intersection.cardinality()+1))+1);
-                        //std::cout<<std::format("Intersection of common pathlets for trajectories {} and {} has max_cardinality of a shattered superset equal to {}\n ", tids[i],tids[j], value.max_cardinality_of_shattered_superset);
-                        if(intersection.cardinality() == inverted_index[tids[i]].cardinality() || intersection.cardinality() == inverted_index[tids[j]].cardinality()){
-                            //std::cout << std::format("Trajectories {} and {} always share the same support, so I remove the pair from F_2\n", tids[i], tids[j]);
-                            F[2].erase(key);
-
-                        }
-                        
-                        
-
-                    }
-
-                }
-            }
-            
-            */
 
 
         };
@@ -716,7 +754,7 @@ class vc_dim_extractor{
                         count = 0;
                     }
                     count++;
-                    //std::cout << s.to_string_readable() <<std::endl;
+                    std::cout << s.to_string() <<std::endl;
 
                 }
                 //set becomes a vector for parallelization later on 
@@ -728,62 +766,7 @@ class vc_dim_extractor{
             }
 
         }
-        /*
-        
-        int compute_exact_vc_dimension(){
-            assert(steps.converted_supports_to_bitsets && steps.computed_frequent_patterns);
-            int max_shattered=  2;
-            std::set<RangeRoaringBitmap<space>> shattered_subsets;
-            //initialize the shattered subsets
-            for (const auto& s: set_of_supports){
-                for (auto& id: s){
-                    shattered_subsets.insert(RoaringRangeBitmap(roaring::Roaring{id}));
-                }
-            }
-            assert(shattered_subsets.size() ==dataset.num_trajs() );
-            int current_visiting_size =2;
-            int largest_size_shattered = 1;
-            bool found_shattered = false;
 
-
-            for (const auto& s : set_of_supports){
-
-                //Update the current visiting size
-                if(s.count() > current_visiting_size && !found_shattered){
-                    break;
-                }
-                if (s.count()> current_visiting_size){
-                    current_visiting_size++;
-                    found_shattered = false;
-                }
-                //Enumerate subsets of s of size current_visiting size -1 and check if they are shattered.
-                //I have to check it here.
-
-
-                std::set<RangeRoaringBitmap<space>> subsets = s.subsets_of_size_minus_one();
-                bool s_shattered = true;
-                for (auto& smaller : subsets){ 
-
-                    if( shattered_subsets.find(smaller) == shattered_subsets.end()){
-                        s_shattered = false;
-                        break;
-                    }
-
-                }
-                if (s_shattered){
-                    found_shattered = true;
-                    shattered_subsets.insert(s);
-                    if (s.count() >=2){
-                        //std::cout << "Shattered set "<<s.to_string_readable() << std::endl;
-                    }
-                    largest_size_shattered = s.count();
-                }
-            }
-
-            return largest_size_shattered;
-        }
-        
-        */
         int compute_exact_vc_dimension(){
             //initializa the F vector with the families. 
             std::cout << std::format("Number of distinct supports is {}\n", set_of_supports.size());
@@ -815,6 +798,7 @@ class vc_dim_extractor{
                 }
 
             }
+            std::cout << std::format("Inverted index at tid 3 is {}\n", RangeRoaringBitmap<space>(inverted_index[3]).to_string());
             std::cout << "Built inverted index...\n";
             for (size_t tid = 0; tid< inverted_index.size(); tid++){
                 bool found_negation = false;
@@ -863,22 +847,9 @@ class vc_dim_extractor{
             
             
             std::cout << "Number of elements of F_2 is "<<F[2].size()<< std::endl;
-            //std::cout << "Cleaning up pairs that always share the same support... \n";
-            //std::erase_if(F[2], [](const auto& item) {auto const& [key, value] = item;  return value.max_cardinality_of_shattered_superset < 2;});
-            //std::erase_if(F[2], [](const auto& item) {auto const& [key, value] = item;  return value.generator_sets < 2;});
-            //std::cout << "Number of elements of F_2 is "<<F[2].size()<< std::endl;
-            //I now  convert F_2 into a Trie to speed up generation of F_3
-            
-            /*
-            
-            std::cout<< "I am adding the pairs to the Trie...\n";
-            for (const auto pair_and_data: F[2]){
-                //std::cout << std::format("Inserting pair {} into the Trie\n", pair_and_data.first.to_string());
-                T[2].insert(pair_and_data.first);
-
-            }
-            */
-
+            //for(const auto& [key, data] : F[2]){
+            //    std::cout << std::format("Pair {} belongs to F[2]\n", key.to_string());
+            //}
             int k = 3;
             while(true){
                 std::cout << std::format("Generating candidates of size {}...\n", k);
@@ -886,151 +857,25 @@ class vc_dim_extractor{
                 std::vector<RangeRoaringBitmap<space>> candidates;
                 RangeRoaringBitmap<space> prefix(std::set<id_t>{});
 
-                generate_candidates(T[k-1],  k, candidates);
-
+                generate_candidates(T[k-1],  k, candidates, set_of_supports, inverted_index);
+                //std::sort(candidates.begin(), candidates.end());
+                //std::cout << "VECTOR CANDIDATES: \n";
+                //for (const auto& c : candidates){
+                //    std::cout << std::format("Candidate generated: {} \n", c.to_string());
+                //}
                 //I already check all subsets are present in the candidate generation phase. 
-                int insertions = 0;
+                int insertions = candidates.size();
+                for (const auto c: candidates){
 
-                //PARALLELIZE CANDIDATE EVALUATION
-                #pragma omp parallel num_threads(6)
-                {
-                    std::set<RangeRoaringBitmap<space>> local_Fk;
-                    int local_insertions = 0;
-                    #pragma omp for schedule(dynamic, 8)
-                    for (int i = 0; i<candidates.size(); i++){
-                        auto c = candidates[i];
-                        
-                        RangeRoaringBitmap<space> intersection(inverted_index[*(c.get_range().begin())]);
-                        for (const auto tid: c.get_range()){
-                            intersection = intersection & inverted_index[tid];
-                            if(intersection.count() == 0){
-                                break;
-                            }
-                        }
-                        if(intersection.count() == 0){
-                            continue;
-                        }
-                        
-                        bool a_subset_cant_be_separated_from_c = false;
-                        
-                        //se l'intesezione ha la stessa cardinalità dei sottinsiemi di taglia -1 it means it is not shatterable, so I won't bother inserting it.
-                        for (const auto& subset: c.subsets_of_size_minus_one()){
-                            RangeRoaringBitmap<space> intersection_subset(inverted_index[*(subset.get_range().begin())]);
-                            for (const auto tid: subset.get_range()){
-                                intersection_subset = intersection_subset & inverted_index[tid];
-                            }
-                            if(intersection_subset.count() == intersection.count()){
-                                a_subset_cant_be_separated_from_c = true;
-                                
-                                break;
-                            }
-                            assert(intersection_subset.count()> intersection.count());
-
-                        }
-                        if(a_subset_cant_be_separated_from_c){
-                            //std::cout << std::format("Set {} and its subset always share the same support, so I don't add the first set to T[{}]\n", c.to_string(), k);
-                            continue;
-                        }
-                        if(!a_subset_cant_be_separated_from_c && is_shattered(c,set_of_supports)){
-                            //std::cout << std::format("inserting the {}-ple {} into the Trie, as the trajectories' intersection is {}\n",k, c.to_string(), intersection.to_string());
-                            local_Fk.insert(c);
-                            local_insertions++;
-                        }
-                    }
-
-                    //merge into Tk
-                    #pragma omp critical
-                    {
-                        for (auto c : local_Fk){
-                            T[k].insert(c);
-                        }
-                        insertions += local_insertions;
-                    }
-
+                    T[k].insert(c);
 
                 }
-                /*
-                for (const auto& c : candidates){
-                    //CHECK Shattering
-                    RangeRoaringBitmap<space> intersection(inverted_index[*(c.get_range().begin())]);
-                    for (const auto tid: c.get_range()){
-                        intersection = intersection & inverted_index[tid];
-                        if(intersection.count() == 0){
-                            break;
-                        }
-                    }
-                    if(intersection.count() == 0){
-                        continue;
-                    }
-                    
-                    bool a_subset_cant_be_separated_from_c = false;
-                    
-                    //se l'intesezione ha la stessa cardinalità dei sottinsiemi di taglia -1 it means it is not shatterable, so I won't bother inserting it.
-                    for (const auto& subset: c.subsets_of_size_minus_one()){
-                        RangeRoaringBitmap<space> intersection_subset(inverted_index[*(subset.get_range().begin())]);
-                        for (const auto tid: subset.get_range()){
-                            intersection_subset = intersection_subset & inverted_index[tid];
-                        }
-                        if(intersection_subset.count() == intersection.count()){
-                            a_subset_cant_be_separated_from_c = true;
-                            
-                            break;
-                        }
-                        assert(intersection_subset.count()> intersection.count());
-
-                    }
-                    if(a_subset_cant_be_separated_from_c){
-                        //std::cout << std::format("Set {} and its subset always share the same support, so I don't add the first set to T[{}]\n", c.to_string(), k);
-                        continue;
-                    }
-                    if(!a_subset_cant_be_separated_from_c && is_shattered(c,set_of_supports)){
-                        //std::cout << std::format("inserting the {}-ple {} into the Trie, as the trajectories' intersection is {}\n",k, c.to_string(), intersection.to_string());
-                        T[k].insert(c);
-                        insertions++;
-                    }
-                    
-                */
-                
-                    
-                    /*
-                    
-                    if(intersection.count() == 0 || intersection.count()==1){
-                        continue;
-                    }
-                    bool a_subset_cant_be_separated_from_c = false;
-                    
-                    //se l'intesezione ha la stessa cardinalità dei sottinsiemi di taglia -1 it means it is not shatterable, so I won't bother inserting it.
-                    for (const auto& subset: c.subsets_of_size_minus_one()){
-                        RangeRoaringBitmap<space> intersection_subset(inverted_index[*(subset.get_range().begin())]);
-                        for (const auto tid: subset.get_range()){
-                            intersection_subset = intersection_subset & inverted_index[tid];
-                        }
-                        if(intersection_subset.count() == intersection.count()){
-                            a_subset_cant_be_separated_from_c = true;
-                            
-                            break;
-                        }
-                        assert(intersection_subset.count()> intersection.count());
-
-                    }
-                    if(a_subset_cant_be_separated_from_c){
-                        //std::cout << std::format("Set {} and its subset always share the same support, so I don't add the first set to T[{}]\n", c.to_string(), k);
-                        continue;
-                    }
-                    
-                    //TODO: CHECK SHATTERING BEFORE INSERTION or before giving up due to not usefulness at higher levels.
-                
-                    
-                
-                    
-                */
-                
-                std::cout<< std::format("I have generated {} candidates of size {}, but due to lack of supports I am adding {}.\n", candidates.size(),k, insertions);
-                
                 if(insertions==0){
                     std::cout<< std::format("I could not fill the trie at size {}, so we break the apriori-like cycle.\n",k);
+                    
                     break;
                 }
+                assert(!T[k].root->children.empty());
                 k++;
 
             }
