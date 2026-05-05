@@ -1,5 +1,6 @@
 #include "freq_st_algo.h"
 #include <bitset>
+#include <chrono>
 #include <boost/dynamic_bitset.hpp>
 #include "roaring.hh"
 #include <omp.h>
@@ -488,8 +489,9 @@ class vc_dim_extractor{
                 std::vector<RangeRoaringBitmap<space>> local_candidates;
                 std::vector<RangeRoaringBitmap<space>> temporary_candidates;
                 int local_generations = 0;
-                #pragma omp for schedule(dynamic, 5)
+                #pragma omp for schedule(dynamic, 32)
                 for (int i = 0; i< children_to_explore.size(); i++){
+                    
                     auto& [key, value] = *(children_to_explore[i]);
                     RangeRoaringBitmap<space> prefix(std::set<id_t>{});
                     prefix.add(key);
@@ -543,7 +545,6 @@ class vc_dim_extractor{
                         }
                     }
                     temporary_candidates.clear();
-
                 }
 
                 #pragma omp critical
@@ -859,6 +860,7 @@ class vc_dim_extractor{
             }
 
             T.push_back(Trie());
+            auto start = std::chrono::high_resolution_clock::now();
             //Fill up F_2 with the appearing pairs.
             if(effective_pairs< possible_pairs){
                 
@@ -868,8 +870,10 @@ class vc_dim_extractor{
                 generate_pairs_by_enumeration(T[2], F[2], F[1], inverted_index);
             }
             
-            
+            auto end = std::chrono::high_resolution_clock::now();
             std::cout << "Number of elements of F_2 is "<<F[2].size()<< std::endl;
+            auto duration = duration_cast<std::chrono::milliseconds>(end - start);
+            std::cout << std::format("It took {} ms to generate the pairs \n", duration.count());
             //for(const auto& [key, data] : F[2]){
             //    std::cout << std::format("Pair {} belongs to F[2]\n", key.to_string());
             //}
@@ -879,8 +883,11 @@ class vc_dim_extractor{
                 T.push_back(Trie());
                 std::vector<RangeRoaringBitmap<space>> candidates;
                 RangeRoaringBitmap<space> prefix(std::set<id_t>{});
-
+                start = std::chrono::high_resolution_clock::now();
                 generate_candidates(T[k-1],  k, candidates, set_of_supports, inverted_index);
+                end = std::chrono::high_resolution_clock::now();
+                duration = duration_cast<std::chrono::milliseconds>(end - start);
+                std::cout << std::format("It took {} ms to generate the {}-ples \n", duration.count(), k);
                 //std::sort(candidates.begin(), candidates.end());
                 //std::cout << "VECTOR CANDIDATES: \n";
                 //for (const auto& c : candidates){
@@ -888,11 +895,15 @@ class vc_dim_extractor{
                 //}
                 //I already check all subsets are present in the candidate generation phase. 
                 int insertions = candidates.size();
+                start = std::chrono::high_resolution_clock::now();
                 for (const auto c: candidates){
 
                     T[k].insert(c);
 
                 }
+                end = std::chrono::high_resolution_clock::now();
+                duration = duration_cast<std::chrono::milliseconds>(end - start);
+                std::cout << std::format("It took {} ms to populate T[{}]. \n", duration.count(), k);
                 if(insertions==0){
                     std::cout<< std::format("I could not fill the trie at size {}, so we break the apriori-like cycle.\n",k);
                     
