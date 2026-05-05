@@ -466,6 +466,8 @@ class vc_dim_extractor{
                     prefix.add(key);
 
                     generate_candidates_recursive(value.get(), prefix, target_k, trie, local_candidates);
+
+                    
                 }
 
                 #pragma omp critical
