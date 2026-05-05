@@ -481,7 +481,7 @@ class vc_dim_extractor{
                 children_to_explore.push_back(it);
             }
             int global_generations = 0;
-            #pragma omp parallel num_threads(6)
+            #pragma omp parallel num_threads(13)
             {
                 std::vector<RangeRoaringBitmap<space>> local_candidates;
                 std::vector<RangeRoaringBitmap<space>> temporary_candidates;
@@ -619,7 +619,7 @@ class vc_dim_extractor{
             for (const auto& [key, data] : F_1){
                 tids.push_back(*(key.get_range().begin()));
             }
-            #pragma omp parallel num_threads(6)
+            #pragma omp parallel num_threads(13)
             {
                 std::map<RangeRoaringBitmap<space>, transaction_set_data> local_F_2;
                 #pragma omp for schedule(dynamic, 8) 
@@ -656,7 +656,7 @@ class vc_dim_extractor{
             }
         };
         static void generate_pairs_from_supports(Trie& T_2, std::map<RangeRoaringBitmap<space>, transaction_set_data>& F_2,const std::vector<RangeRoaringBitmap<space>>& set_of_supports, const std::vector<roaring::Roaring>& inverted_index){
-            #pragma omp parallel num_threads(6)
+            #pragma omp parallel num_threads(13)
             {
                 int tid = omp_get_thread_num();
                 int nthreads = omp_get_num_threads();
