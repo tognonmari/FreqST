@@ -5,6 +5,10 @@
 #include "roaring.hh"
 #include <omp.h>
 namespace frechet{
+
+
+std::vector<int> POWERS_OF_TWO = {0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608, 16777216, 33554432, 67108864, 134217728, 268435456, 536870912};
+
 template <metric_space space>
 class RangeBitset{
 
@@ -571,20 +575,39 @@ class vc_dim_extractor{
         }
         static bool is_shattered(const RangeRoaringBitmap<space>& candidate, const std::vector<RangeRoaringBitmap<space>>& ranges, const std::vector<roaring::Roaring>& inverted_index){
 
-            std::vector<id_t> elems;
-            elems.reserve(candidate.count());
-
             // Extract elements from Roaring bitmap
             roaring::Roaring trajectory_ids = candidate.get_range();
+            roaring::Roaring filtered_ranges;
             //roaring::Roaring filtered_ranges;
-            //std::cout<< std::format("--------------checking shattering for set {}\n", candidate.to_string());
+            //std::cout<< std::format("--------------checking shattering for set {}, for which i need {} sets. \n", candidate.to_string(), POWERS_OF_TWO[candidate.count()+1]-1);
             for (auto it = trajectory_ids.begin(); it != trajectory_ids.end(); ++it) {
-                elems.push_back(*it);
-                //filtered_ranges |= inverted_index[*it];
+                
+                filtered_ranges |= inverted_index[*it];
             }
+            //std::cout << "FILTERED RANGES: \n";
+            //for (const auto item: filtered_ranges){
 
-            int n = elems.size();
+            //    std::cout << ranges[item].to_string()<< "\n";
 
+            //}
+            std::set<RangeRoaringBitmap<space>> found_ranges;
+            
+            for (const auto item : filtered_ranges ){
+
+                RangeRoaringBitmap<space> intersection(candidate.get_range() & ranges[item].get_range());
+                if(found_ranges.find(intersection)== found_ranges.end()){
+                    //std::cout<< std::format("I can realize subset {} of set {} with range {}\n",intersection.to_string(), candidate.to_string(), ranges[item].to_string());
+                    found_ranges.insert(intersection);
+                }
+                if(found_ranges.size() == (POWERS_OF_TWO[candidate.count()+1]-1)){
+                    //std::cout<< std::format("I have found {} ranges, hence i can shatter set {} of size {}.\n", found_ranges.size(), candidate.to_string(), candidate.count() );
+                    return true;
+                }
+
+            }
+            
+            return false;
+            /*
             // Iterate over all non-empty subsets
             for (uint64_t mask = 1; mask < (1ULL << n); ++mask) {
                 
@@ -619,6 +642,7 @@ class vc_dim_extractor{
             }
             //std::cout<<std::format("Set {} is shattered.\n", candidate.to_string());
             return true;
+            */
         };
         static void generate_pairs_by_enumeration(Trie& T_2, std::map<RangeRoaringBitmap<space>, transaction_set_data>& F_2,std::map<RangeRoaringBitmap<space>, transaction_set_data>& F_1,std::vector<roaring::Roaring> inverted_index, int threads){
 
@@ -762,7 +786,7 @@ class vc_dim_extractor{
                 }
                 //std::cout << "SUPPORTS "<< std::endl;
                 int current_visiting_size = 1;
-                std::cout << "Set of supports size : "<< temporary_set_of_supports.size() << std::endl;
+                //std::cout << "Set of supports size : "<< temporary_set_of_supports.size() << std::endl;
                 int count = 0;
                 for (auto&s : temporary_set_of_supports){
 
@@ -779,7 +803,7 @@ class vc_dim_extractor{
                 //set becomes a vector for parallelization later on 
                 std::vector<RangeRoaringBitmap<space>> supports_vec(temporary_set_of_supports.begin(),temporary_set_of_supports.end());
                 set_of_supports = supports_vec;
-                //std::cout << std::format("I have {} supports of size {}\n", count, current_visiting_size);
+                std::cout << std::format("I have {} supports of size {}\n", count, current_visiting_size);
                 for(id_t j = 0; j <set_of_supports.size(); j++){
 
                    set_of_supports[j].set_range_id(j);
@@ -927,6 +951,7 @@ class vc_dim_extractor{
     std::vector<RangeRoaringBitmap<space>> set_of_supports;
     steps_taken steps;
     int threads;
+    //constexpr static std::vector<int> POWERS_OF_TWO= {0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608, 16777216, 33554432, 67108864, 134217728, 268435456, 536870912};
     
 };
 
