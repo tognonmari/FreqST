@@ -231,6 +231,7 @@ int main(int argc, char** argv){
             auto end = chrono::high_resolution_clock::now();
             auto duration = duration_cast<chrono::milliseconds>(end - start);
             std::cout << "TIME: "<<duration.count() << std::endl;
+            break;
         }
         case sampling_mode::pathlet_aware_intersection_vc:{
             auto start = chrono::high_resolution_clock::now();
@@ -238,7 +239,7 @@ int main(int argc, char** argv){
             auto end = chrono::high_resolution_clock::now();
             auto duration = duration_cast<chrono::milliseconds>(end - start);
             std::cout << "TIME: "<<duration.count() << std::endl;
-
+            break;
         }
     } 
 
