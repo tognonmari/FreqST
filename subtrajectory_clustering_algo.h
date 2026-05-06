@@ -39,7 +39,7 @@ public:
     using subtrajectory_cluster_t = subtrajectory_cluster<space>;
 
     using efficacy_factor_t = internal::efficacy_factor_vec<distance_t>;
-
+    
     using frequent_pathlet = frechet::frequent_subtrajectory_algo<space>::frequent_pathlet;
     using frequent_subtrajectory_algo_t = frechet::frequent_subtrajectory_algo<space>;
     using cluster_quality_t = sparse_free_space_graph_incremental<space>::cluster_quality;
@@ -65,6 +65,9 @@ public:
                     config(config)
     {
         initialize_distance_limits(min_distance, max_distance);
+        
+        
+        
     }
 
     // Perform clustering for $EVAL = CENTER$.
@@ -120,7 +123,7 @@ public:
             algo.compute_maximal_frequent_pathlets();
             std::swap(algo.freq_pathlets, max_freq_pathlets_by_distance);
             //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
-            std::sort(max_freq_pathlets_by_distance.begin(), max_freq_pathlets_by_distance.end(), pathlet_sorter_by_length);
+            std::sort(max_freq_pathlets_by_distance.begin(), max_freq_pathlets_by_distance.end(), pathlet_sorter_by_frequency);
             //auto rng = std::default_random_engine {};
             //std::ranges::shuffle(max_freq_pathlets_by_distance.at(i), rng);
             first_uncovered_pathlet_by_distance = (max_freq_pathlets_by_distance.size() - 1); //initialize with the last pathlet
@@ -246,6 +249,7 @@ public:
             for (auto &algo : clustering_algos) {
                 algo->establish_cluster(best_cluster);
             }
+            std::cout << "UNCOVERED POINTS : "<< clustering_algos.front()->count_remaining_points() << std::endl;
         }
         // all algorithms store the same clustering.
         clustering_algos.front()->drop_inefficient_clusters_means(efficacy_factors);
@@ -806,7 +810,7 @@ public:
         double radius = std::sqrt(dist);
         range_search_t rs(sample);
         //float frequency_threshold = 0.05;
-        frequent_subtrajectory_algo_simplified<space> temp_algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
+        frequent_subtrajectory_algo_simplified<space> temp_algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor, this->efficacy_factors); //infilename needs to be passed as parameter to the clustering algorithm
         temp_algo.compute_maximal_frequent_pathlets();
         temp_algo.unsimplify_collected_pathlets(this->trajectory);
         //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
@@ -831,7 +835,7 @@ public:
             double radius = std::sqrt(dist);
             range_search_t rs(sample);
             //float frequency_threshold = 0.05;
-            frequent_subtrajectory_algo_simplified<space> algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
+            frequent_subtrajectory_algo_simplified<space> algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor, this->efficacy_factors); //infilename needs to be passed as parameter to the clustering algorithm
             algo.compute_maximal_frequent_pathlets();
             algo.unsimplify_collected_pathlets(this->trajectory);
             //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
@@ -1001,13 +1005,16 @@ public:
         double radius = std::sqrt(dist);
         range_search_t rs(sample);
         //float frequency_threshold = 0.05;
-        frequent_subtrajectory_algo_simplified<space> temp_algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
+        frequent_subtrajectory_algo_simplified<space> temp_algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor, this->efficacy_factors, true); //infilename needs to be passed as parameter to the clustering algorithm
         temp_algo.compute_maximal_frequent_pathlets();
+        frechet::internal::curve_simplification<space> simpl_original_traj{this->trajectory, radius, simplification_factor};
+        //temp_algo.compute_gamma_for_collected_pathlets(simpl_original_traj.trajectory());
         temp_algo.unsimplify_collected_pathlets(this->trajectory);
         //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
         std::swap(temp_algo.freq_pathlets, max_freq_pathlets_by_distance.at(sq_distances.size()-1));
         //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
-        std::sort(max_freq_pathlets_by_distance[sq_distances.size()-1].begin(), max_freq_pathlets_by_distance[sq_distances.size()-1].end(), pathlet_sorter_by_frequency);
+        //compute_gamma_for_remaining_pathlets(max_freq_pathlets_by_distance.at(sq_distances.size()-1), first_uncovered_pathlet_by_distance[sq_distances.size()-1], trajectory, sq_distances[sq_distances.size()-1], this->efficacy_factors);
+        std::sort(max_freq_pathlets_by_distance[sq_distances.size()-1].begin(), max_freq_pathlets_by_distance[sq_distances.size()-1].end(), pathlet_sorter_by_frequency); // ADD PATHELET SORTER BY SCORE!
         std::cout <<(max_freq_pathlets_by_distance[sq_distances.size()-1].size())<<std::endl;
         //auto rng = std::default_random_engine {};
         //std::ranges::shuffle(max_freq_pathlets_by_distance.at(i), rng);
@@ -1026,17 +1033,24 @@ public:
             double radius = std::sqrt(dist);
             range_search_t rs(sample);
             //float frequency_threshold = 0.05;
-            frequent_subtrajectory_algo_simplified<space> algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
+            frequent_subtrajectory_algo_simplified<space> algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor, this->efficacy_factors, true); //infilename needs to be passed as parameter to the clustering algorithm
             algo.compute_maximal_frequent_pathlets();
+            frechet::internal::curve_simplification<space> simpl_original_traj{this->trajectory, radius, simplification_factor};
+            //algo.compute_gamma_for_collected_pathlets(simpl_original_traj.trajectory());
             algo.unsimplify_collected_pathlets(this->trajectory);
             //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
             std::swap(algo.freq_pathlets, max_freq_pathlets_by_distance.at(i));
+            first_uncovered_pathlet_by_distance[i] = (max_freq_pathlets_by_distance[i].size() - 1);
             //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
+            if(!max_freq_pathlets_by_distance.at(i).empty()){
+                //compute_gamma_for_remaining_pathlets(max_freq_pathlets_by_distance.at(i), first_uncovered_pathlet_by_distance[i], trajectory, sq_distances[i], this->efficacy_factors);
             std::sort(max_freq_pathlets_by_distance[i].begin(), max_freq_pathlets_by_distance[i].end(), pathlet_sorter_by_frequency);
+            }
+            
             std::cout <<(max_freq_pathlets_by_distance[i].size())<<std::endl;
             //auto rng = std::default_random_engine {};
             //std::ranges::shuffle(max_freq_pathlets_by_distance.at(i), rng);
-            first_uncovered_pathlet_by_distance[i] = (max_freq_pathlets_by_distance[i].size() - 1); //initialize with the last pathlet
+             //initialize with the last pathlet
             if(i==sq_distances.size() -1){
 
                 std::cout << "Found this longest frequent pathlet " << max_freq_pathlets_by_distance[i].back().extremes.first << " " << max_freq_pathlets_by_distance[i].back().extremes.second << " with mother " << max_freq_pathlets_by_distance[i].back().pathlet_mother <<  std::endl;
@@ -1045,9 +1059,9 @@ public:
 
         }
         std::cout << "Frequent pathlets computed for all distances.\n";
-
+        int iterations = 0;
         while (clustering_algos.front()->count_remaining_points() > 0) {
-            
+            iterations++;
             #pragma omp parallel for
             for (size_t i = 0; i < clustering_algos.size(); ++i) {
                 
@@ -1134,9 +1148,23 @@ public:
                         first_uncovered_pathlet_by_distance[i] = -1; //no uncovered pathlet found
 
                     }
-
+                    /*
+                    if(iterations%10==0 && first_uncovered_pathlet_by_distance[i]>=0){
+                        std::cout<< "Updating the scores-..."<<std::endl;
+                        trajectory_t temp = clustering_algos[i]->get_trajectory();
+                        float efficacy_of_first_pathlet = max_freq_pathlets_by_distance.at(i)[first_uncovered_pathlet_by_distance[i]].efficacy;
+                        compute_gamma_for_remaining_pathlets(max_freq_pathlets_by_distance.at(i), first_uncovered_pathlet_by_distance[i], temp, sq_distances[i], this->efficacy_factors);
+                        std::sort(max_freq_pathlets_by_distance[i].begin(), max_freq_pathlets_by_distance[i].begin() + first_uncovered_pathlet_by_distance[i]+1, pathlet_sorter_by_score);
+                    }
+                    */
+                    
+                    
                 }
-            }            
+
+                
+            } 
+            
+            
         
         }
         // all algorithms store the same clustering.
@@ -1180,8 +1208,12 @@ public:
         double radius = std::sqrt(dist);
         range_search_t rs(sample);
         //float frequency_threshold = 0.05;
-        frequent_subtrajectory_algo_simplified<space> temp_algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
+        auto initial = std::chrono::high_resolution_clock::now();
+        frequent_subtrajectory_algo_simplified<space> temp_algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor, this->efficacy_factors, true); //infilename needs to be passed as parameter to the clustering algorithm
         temp_algo.compute_maximal_frequent_pathlets();
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::seconds>(end-initial);
+        std::cout << "it took me this much in (seconds) to compute FP "<<duration <<std::endl;
         temp_algo.unsimplify_collected_pathlets(this->trajectory);
         std::set<frequent_pathlet> temp_set(temp_algo.freq_pathlets.begin(), temp_algo.freq_pathlets.end());
         //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
@@ -1199,7 +1231,7 @@ public:
             distance_t radius = std::sqrt(dist);
             range_search_t rs(sample);
             //float frequency_threshold = 0.05;
-            frequent_subtrajectory_algo_simplified<space> algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
+            frequent_subtrajectory_algo_simplified<space> algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor, this->efficacy_factors, true); //infilename needs to be passed as parameter to the clustering algorithm
             algo.compute_maximal_frequent_pathlets();
             algo.unsimplify_collected_pathlets(this->trajectory);
             std::set<frequent_pathlet> temp(algo.freq_pathlets.begin(), algo.freq_pathlets.end());
@@ -1211,7 +1243,8 @@ public:
 
         }
         std::cout << "Frequent pathlets computed for all distances.\n";
-
+        int fp_selections = 0;
+        srand((seed));
         while (clustering_algos.front()->count_remaining_points() > 0) {
             
             #pragma omp parallel for
@@ -1226,11 +1259,11 @@ public:
                     int counter = 0;
 
                     int size = max_freq_pathlets_by_distance[i].size();
-                    srand((seed));
+                    
 
                     // Generate a random number between 0 and 100
                     
-                    for (int attempt =0; attempt< k && attempt < max_freq_pathlets_by_distance[i].size(); attempt++){
+                    for (int attempt =0; attempt< k*(sq_distances.size()-1-i) && attempt < max_freq_pathlets_by_distance[i].size(); attempt++){
 
                         int randomNum = rand() % size;
                         frequent_pathlet cluster_center = *(std::next(max_freq_pathlets_by_distance[i].begin(), randomNum));
@@ -1243,12 +1276,13 @@ public:
                         subtrajectory_clustering_rightstep<space> clustering_algos_rightstep(temp, std::vector<index_t>(temp.total_size(), index_t{1}), range_search, config);
                         candidate_cluster = clustering_algos_rightstep.cluster_from_candidate(sq_distances[i], cl_qual);
                         distance_t cluster_gamma = clustering_algos[i]->compute_gamma(output_cluster, efficacy_factors);
-                        if (cluster_gamma < temp_gamma){
+                        if (cluster_gamma <temp_gamma){
 
                             temp_gamma = cluster_gamma;
                             std::swap(candidate_cluster, output_cluster);
 
                         }
+                        
                     }
 
                 }
@@ -1264,6 +1298,11 @@ public:
             }
             // Pick best cluster as in Section 4.3 of Agarwal et. al, 2018.
             size_t best_i = std::max_element(gamma.begin(), gamma.end()) - gamma.begin();
+            
+            if(max_freq_pathlets_by_distance.at(best_i).size()> 0){
+                std::cout<< "************** A FREQUENT PATHLET WAS SELECTED **************"<<std::endl;
+                fp_selections++;
+            }
             auto &best_cluster = candidate_clusters[best_i].second;
             k_cluster_detail::prune_inefficient_subtrajectories(trajectory, best_cluster, gamma[best_i], efficacy_factors);
             //TODO: Once the best cluster is selected, delete the unwanted pathlets from the frequent files. I should have a nice way of compputing these
@@ -1319,6 +1358,7 @@ public:
         // all algorithms store the same clustering.
         clustering_algos.front()->drop_inefficient_clusters_means(efficacy_factors);
         pathlets = clustering_algos.front()->get_clusters();
+        std::cout<< "SELECTED FREQ PATHLETS : " << fp_selections << std::endl;
         //Should I unsimpify the clusters+centers here?
 
 
@@ -1361,46 +1401,6 @@ private:
     const efficacy_factor_t efficacy_factors;
     rightstep_config config;
 
-    /*
-    void mine_frequent_pathlets(trajectory_t& sample, std::string infilename, float frequency_threshold, std::vector<std::set<frequent_pathlet>>& max_freq_pathlets_by_distance, aided_means_config& aided_means_cluster_parameters){
-
-        const auto &dist = sq_distances.back();
-        // Compute the frequent pathlets, then swap the values of the freq pathlets vector into the new one before deletion
-        double radius = std::sqrt(dist);
-        range_search_t rs(sample);
-        //float frequency_threshold = 0.05;
-        frequent_subtrajectory_algo_simplified<space> temp_algo(sample, rs, infilename, frequency_threshold, radius, config.curve_simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
-        temp_algo.compute_maximal_frequent_pathlets();
-        temp_algo.unsimplify_collected_pathlets(sample);
-        //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
-        std::set<frequent_pathlet> temp(algo.freq_pathlets.begin(), algo.freq_pathlets.end());
-        std::swap(temp, max_freq_pathlets_by_distance.at(sq_distances.size()-1));
-        
-        for(int i = sq_distances.size()-2; i>=0; i--){
-            const auto &dist = sq_distances.at(i);
-            // Compute the frequent pathlets, then swap the values of the freq pathlets vector into the new one before deletion
-            float radius = std::sqrt(dist);
-            range_search_t rs(sample);
-            
-            frequent_subtrajectory_algo_t algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
-            algo.compute_maximal_frequent_pathlets();
-            //std::swap(algo.freq_pathlets, max_freq_pathlets_by_distance.at(i));
-            //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
-            std::set<frequent_pathlet> temp(algo.freq_pathlets.begin(), algo.freq_pathlets.end());
-
-            std::swap(temp, max_freq_pathlets_by_distance.at(i));
-            std::cout <<(max_freq_pathlets_by_distance[i].size())<< ","<< algo.freq_pathlets.size()<<std::endl;
-            
-        }
-        std::cout << "Frequent pathlets computed for all distances.\n";
-
-
-    }
-
-    */
-    
-
-
     void initialize_distance_limits(distance_t min_distance, distance_t max_distance){
         if(min_distance < 0 || max_distance < 0){
             const auto [trajectory_min_sq, trajectory_max_sq] = k_cluster_detail::compute_min_max_sq_distance(trajectory, range_search);
@@ -1429,7 +1429,19 @@ private:
         return false;
 
     }
-    //TODO. break ties by length????
+    static inline bool pathlet_sorter_by_score(frequent_pathlet p1, frequent_pathlet p2){
+
+        if(p1.efficacy < p2.efficacy){
+
+            return true;
+        }
+        
+
+        return false;
+        
+
+
+    }
     static inline bool pathlet_sorter_by_frequency(frequent_pathlet p1, frequent_pathlet p2){
 
         if(p1.frequency < p2.frequency){
@@ -1490,7 +1502,51 @@ private:
         return cluster;
     }
 
-    
+    static void compute_gamma_for_remaining_pathlets(std::vector<frequent_pathlet>& p_vector, int first_uncovered_pathlet_by_distance, const trajectory_t& current_trajectory, distance_t sq_dist, efficacy_factor_t efficacy_factors){
+
+        rightstep_config config{false, 0.0, true, 0.0}; //this is useless for me but i need this object to initialize the algorithm, even though i only evaluate the score
+        fixed_d_cluster fd_cluster{current_trajectory, sq_dist};
+        //int num_expected_changes = p_vector.size() - first_uncovered_pathlet_by_distance;
+        int iters = 0;
+        for (int t=first_uncovered_pathlet_by_distance; t>=0; t--){
+            iters++;
+            auto& fp = p_vector[t];
+            subtrajectory_t offsets = fp.extremes;
+            id_t pathlet_mother = fp.pathlet_mother;
+            index_t initial_point = current_trajectory.get_first_point_in_trajectory(pathlet_mother);
+
+            //std::cout << "The pathelt mother starts at " << initial_point << std::endl;
+            subtrajectory_t indexes_in_trajectory= {initial_point+offsets.first, initial_point+ offsets.second};
+            //std::cout << "The subtrajectory is from " << st.first << " to " << st.second << std::endl;
+            //ASSERT THE PATHLET IS NOT COVERED!!!!!!! Otherwise SET TS EFFICACY TO the worst!
+            bool covered = false;
+                        
+            for(index_t h = indexes_in_trajectory.first; h <= indexes_in_trajectory.second; h++){
+                if(current_trajectory.is_point_deleted(h)){
+                    covered = true;
+                    break;
+                }
+            }
+            if(covered){
+
+                fp.efficacy = -1;
+                continue;
+            }
+            //efficacy computation + drequired data structures....
+            cluster_quality_t cl_qual(0,0,sq_dist, indexes_in_trajectory.first, indexes_in_trajectory.second);
+            range_search_t rs(current_trajectory);
+
+            subtrajectory_clustering_rightstep<space> clustering_algos_rightstep(current_trajectory, std::vector<index_t>(current_trajectory.total_size(), index_t{1}), rs, config);
+            subtrajectory_cluster_t candidate_cluster = clustering_algos_rightstep.cluster_from_candidate(sq_dist, cl_qual);
+            distance_t cluster_gamma = fd_cluster.compute_gamma(candidate_cluster, efficacy_factors);
+            fp.efficacy = cluster_gamma;
+
+
+        }
+
+        //assert(iters==num_expected_changes);
+
+    }
     
     // spacing out row indices ensures that subtrajectories stay within a trajectory.
     index_t my_spaced_index(index_t index){

@@ -595,10 +595,10 @@ class vc_dim_extractor{
             for (const auto item : filtered_ranges ){
 
                 RangeRoaringBitmap<space> intersection(candidate.get_range() & ranges[item].get_range());
-                if(found_ranges.find(intersection)== found_ranges.end()){
+                //if(found_ranges.find(intersection)== found_ranges.end()){
                     //std::cout<< std::format("I can realize subset {} of set {} with range {}\n",intersection.to_string(), candidate.to_string(), ranges[item].to_string());
-                    found_ranges.insert(intersection);
-                }
+                found_ranges.insert(intersection);
+                //}
                 if(found_ranges.size() == (POWERS_OF_TWO[candidate.count()+1]-1)){
                     //std::cout<< std::format("I have found {} ranges, hence i can shatter set {} of size {}.\n", found_ranges.size(), candidate.to_string(), candidate.count() );
                     return true;
