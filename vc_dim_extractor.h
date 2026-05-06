@@ -583,9 +583,9 @@ class vc_dim_extractor{
             //std::cout<< std::format("--------------checking shattering for set {}, for which i need {} sets. \n", candidate.to_string(), POWERS_OF_TWO[candidate.count()+1]-1);
             for (auto it = trajectory_ids.begin(); it != trajectory_ids.end(); ++it) {
                 elems.push_back(*it);
-                filtered_ranges |= inverted_index[*it];
+                //filtered_ranges |= inverted_index[*it];
             }
-            std::cout << std::format("Filtered ranges have cardinality {} \n", filtered_ranges.cardinality());
+            //std::cout << std::format("Filtered ranges have cardinality {} \n", filtered_ranges.cardinality());
             //for (const auto item: filtered_ranges){
 
             //    std::cout << ranges[item].to_string()<< "\n";
@@ -681,7 +681,7 @@ class vc_dim_extractor{
                     }
                     
                     if (!found_a_range) {
-                        std::cout<< std::format("Set {} is not shattered because no range containing {} has intersection {} with {}. OUTPUTFALSE\n", candidate.to_string(), subset.to_string(), subset.to_string(), candidate.to_string());
+                        //std::cout<< std::format("Set {} is not shattered because no range containing {} has intersection {} with {}. OUTPUTFALSE\n", candidate.to_string(), subset.to_string(), subset.to_string(), candidate.to_string());
                         return false;
                     }
 
