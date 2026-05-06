@@ -286,7 +286,7 @@ class vc_dim_extractor{
                     //TODO: check items inside temp candidates, append the shattered ones to local candidates and clean temporary_cand
                     
                     local_generations += temporary_candidates.size();
-                    
+                    int previously_added = local_candidates.size();
                     for (int i = 0; i<temporary_candidates.size(); i++){
                         auto c = temporary_candidates[i];
                         
@@ -328,6 +328,9 @@ class vc_dim_extractor{
                             local_candidates.push_back(c);
                             
                         }
+                    }
+                    if((inverted_index.size()>10000) && (target_k == 3)){
+                        std::cout<< std::format("I have generated {} triples\n", local_candidates.size() -previously_added) ;
                     }
                     temporary_candidates.clear();
                 }
