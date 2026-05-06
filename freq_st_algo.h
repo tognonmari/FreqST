@@ -416,18 +416,19 @@ class freq_subtrajectory_sampler{
             RangeRoaringBitmap<space> traj_set_thirds(std::set<id_t>({}));
             RangeRoaringBitmap<space> traj_set_ends(std::set<id_t>({}));
             float squared_distance_threshold = distance_threshold *distance_threshold;
-            for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-                //if(i%10000 == 0){
+            for(index_t i =0; i<the_trajectory.get_actual_size(); i++){
+                //std::cout << "I am visiting point "<< i <<std::endl;
+                if(i%10000 == 0){
                     
-                //std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+                std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
 
-                //}
+                }
                 if(the_trajectory.get_id_at(i) == last_seen_trajectory){
-
+                    
                     point_t point = the_trajectory[i];
                     
 
-                    for (const auto idx: search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
 
                         traj_set_beginnings.add(idx);
                         
@@ -467,29 +468,9 @@ class freq_subtrajectory_sampler{
                     
                     // Append the result up to now to c
                     if(thorough && min_length >=3){
-                        /*
+                    
+                       if(last_seen_trajectory >=0){
                         
-                        if(thorough && min_length >=4){
-                            for (auto it = traj_set_ends.begin(); it != traj_set_ends.end(); ) {
-                                if (traj_set_seconds.find(*it) == traj_set_seconds.end()) {
-                                    it = traj_set_ends.erase(it);  // erase returns next iterator
-                                } else {
-                                    ++it;
-                                }
-                            }
-
-                        }
-                        
-                        if(thorough && min_length >=5){
-                            for (auto it = traj_set_ends.begin(); it != traj_set_ends.end(); ) {
-                                if (traj_set_thirds.find(*it) == traj_set_thirds.end()) {
-                                    it = traj_set_ends.erase(it);  // erase returns next iterator
-                                } else {
-                                    ++it;
-                                }
-                            }
-                        }
-                        */
                        inverted_index[last_seen_trajectory].first = last_seen_trajectory;
                         for(const auto pid : (traj_set_beginnings.get_range() & traj_set_ends.get_range())){
                             columns_map[pid].add(last_seen_trajectory);
@@ -498,9 +479,12 @@ class freq_subtrajectory_sampler{
                         }
                         c.push_back(floor(log2(std::count_if(traj_set_beginnings.range.begin(), traj_set_beginnings.range.end(), [&](const auto& x){ return traj_set_ends.get_range().contains(x); })) + 1));
 
+
+                       }
                     }
                     else{
-                        
+                        if(last_seen_trajectory >= 0){
+                            
                        inverted_index[last_seen_trajectory].first = last_seen_trajectory;
                         for(const auto pid : (traj_set_beginnings.get_range())){
                             columns_map[pid].add(last_seen_trajectory);
@@ -508,6 +492,8 @@ class freq_subtrajectory_sampler{
 
                         }
                         c.push_back(floor(log2(traj_set_beginnings.count()) + 1));
+
+                        }
                     }
                     
                     //initialize the set again 
@@ -519,7 +505,7 @@ class freq_subtrajectory_sampler{
                     */
                     last_seen_trajectory = the_trajectory.get_id_at(i);
                     //add info for the current point
-                    for (const auto idx: search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
 
                         traj_set_beginnings.add(idx);
                         
@@ -535,42 +521,23 @@ class freq_subtrajectory_sampler{
                     }
 
                     }
-                    /*
-                    if (thorough && min_length >=4){
-
-                        for (const auto idx: search_seconds.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
-
-                            traj_set_seconds.insert(idx);
-
-                        }
-                    }
-
-                    if (thorough && min_length >=5){
-
-                        for (const auto idx: search_thirds.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
-
-                            traj_set_thirds.insert(idx);
-
-                        }
-                    }
-                    
-                    */
                 }
 
             }
 
             //PRINT THE DATA STRUCTURES TO CHECK 
             // Print inverted_index
-            /*
             
+            /*
             std::cout << "---------------------------------Printing inverted_index...\n";
             for (id_t i = 0; i <inverted_index.size(); i++){
 
                 std::cout << std::format("Trajectory with id {} has {} potentially matching pathlets, which are {}\n", inverted_index[i].first, inverted_index[i].second.count(), inverted_index[i].second.to_string());
 
             }
+            
+            std::cout<< "I finished adding\n";
             */
-
             std::sort(inverted_index.begin(), inverted_index.end(), [](const auto& a, const auto& b) {return b.second < a.second;});
             
             /*
@@ -580,7 +547,9 @@ class freq_subtrajectory_sampler{
                 std::cout << std::format("Trajectory with id {} has {} potentially matching pathlets, which are {}\n", inverted_index[i].first, inverted_index[i].second.count(), inverted_index[i].second.to_string());
 
             }
+            
             */
+            
 
             // Print map data structure
             /*
@@ -594,7 +563,14 @@ class freq_subtrajectory_sampler{
             */
 
             std::sort(c.begin(),c.end(), std::greater<>());
-            
+            /*
+            std::cout << "---------------------------------Printing SORTED inverted_index...\n";
+            for (id_t i = 0; i <inverted_index.size(); i++){
+
+                std::cout << std::format("Trajectory with id {} has {} potentially matching pathlets, which are {}\n", inverted_index[i].first, inverted_index[i].second.count(), inverted_index[i].second.to_string());
+
+            }            
+            */
             //Now I start with the algorithm 
             int vc_dim = 0;
             
@@ -624,9 +600,9 @@ class freq_subtrajectory_sampler{
                         break;
                     }
                 }
-                std::cout << std::format("I am trying to exclude VC-dim = {}:  c_k is {}.\n", k, c_k);
-                std::cout << std::format("The candidate tids for this case are {}, which are {}\n", tids_for_a_shatterable_set.count(), tids_for_a_shatterable_set.to_string());
-                std::cout << std::format("I now build the restricted pathlet map...");
+                //std::cout << std::format("I am trying to exclude VC-dim = {}:  c_k is {}.\n", k, c_k);
+                //std::cout << std::format("The candidate tids for this case are {}, which are {}\n", tids_for_a_shatterable_set.count(), tids_for_a_shatterable_set.to_string());
+                //std::cout << std::format("I now build the restricted pathlet map...");
                 std::map<unsigned int, RangeRoaringBitmap<space>> restricted_column_map;
             
                 for (const auto& item : columns_map){
@@ -636,15 +612,15 @@ class freq_subtrajectory_sampler{
                     }
 
                 }
-                std::cout << std::format( "PRINTING the restricted map for k = {}...\n",k);
+                //std::cout << std::format( "PRINTING the restricted map for k = {}...\n",k);
 
-                for (const auto& entry : restricted_column_map){
-                    unsigned int pid = entry.first;
-                    RangeRoaringBitmap<space> column(entry.second.get_range()); //inefficient but this is just for debugging 
-                    std::cout << std::format("Pathlet with pid {} appears in {} trajectories, which are {}\n", pid, column.count(), column.to_string());
-                }
+                //for (const auto& entry : restricted_column_map){
+                //    unsigned int pid = entry.first;
+                //    RangeRoaringBitmap<space> column(entry.second.get_range()); //inefficient but this is just for debugging 
+                    //std::cout << std::format("Pathlet with pid {} appears in {} trajectories, which are {}\n", pid, column.count(), column.to_string());
+                //}
 
-                std::cout << std::format("Converting the map to vector. (Recall you cannot remove duplicate sets unless they are VERY MUCH REPEATED - i omit this for now to be extra conservative in the upper bound).\n");
+                //std::cout << std::format("Converting the map to vector. (Recall you cannot remove duplicate sets unless they are VERY MUCH REPEATED - i omit this for now to be extra conservative in the upper bound).\n");
                 std::vector<RangeRoaringBitmap<space>> restricted_ranges_list; // I will be looking only at the cardinality 
                 for (const auto entry : columns_map){
                     restricted_ranges_list.push_back(entry.second); //inefficient but this is just for debugging 
@@ -685,9 +661,9 @@ class freq_subtrajectory_sampler{
                     }
 
                 }
-                break;
                 
-                if(unshatterable){
+                
+                if(unshatterable || c_k == 0){
                     
                     std::cout<< std::format("With the restricted pathlets I cannot shatter a set with cardinality as large as {}. Hence, I can try the lower value as a better upper bound.\n", k);
                     k--;
@@ -703,7 +679,7 @@ class freq_subtrajectory_sampler{
             //std::cout <<std::format( "I could not shatter anything of size larger than {}. The standard unaware upper bound was instead {}\n", k, vc_dim);
             
 
-            
+            std::cout<<"OLD VC DIM ESTIMATE WAS "<<vc_dim<< "\n";
             std::cout <<"VC DIM ESTIMATE IS "<< k <<"\n";
             return k;
 
