@@ -131,7 +131,9 @@ class frequent_subtrajectory_algo_simplified{
                 int prev_length = pathlet_mother.total_size();
                 frechet::internal::curve_simplification<space> pathlet_simplification(pathlet_mother, this->distance_threshold * this->distance_threshold, this->curve_simplification_factor);
                 pathlet_mother = pathlet_simplification.trajectory();
-                
+                if (prev_length > pathlet_mother.total_size()){
+                    std::cout <<"I am simplifying!\n";
+                }
                 //std::cout << "I AM QUERYING PM WITH ID "<<pathlet_mother.get_id_at(0)<<" AND SIZE "<<pathlet_mother.total_size()<<std::endl;
                 BinaryPathletTree pathlet_tree(pathlet_mother, pathlet_mother.get_id_at(0),floor(log2(pathlet_mother.total_size())) + 1,1);
                 //std::cout<< pathlet_tree.toString()<< std::endl;
