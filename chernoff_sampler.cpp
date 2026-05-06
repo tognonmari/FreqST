@@ -41,7 +41,9 @@ enum class sampling_mode {
     vc_no_erase = 8,
     intersection_vc_no_erase = 9,
     pathlets_vc = 10,
-    intersection_pathlets_vc = 11
+    intersection_pathlets_vc = 11,
+    pathlet_aware_vc = 12,
+    pathlet_aware_intersection_vc = 13
 };
 
 int main(int argc, char** argv){
@@ -113,7 +115,7 @@ int main(int argc, char** argv){
         pathletsfilename = infilename;
     }
 
-    if (mode == sampling_mode::intersection_vc || mode== sampling_mode::minimum_rough_vc || mode == sampling_mode::minimum_rough_vc_no_erase || mode== sampling_mode::intersection_pathlets_vc ){
+    if (mode == sampling_mode::intersection_vc || mode== sampling_mode::minimum_rough_vc || mode == sampling_mode::minimum_rough_vc_no_erase || mode== sampling_mode::intersection_pathlets_vc || mode == sampling_mode::pathlet_aware_intersection_vc ){
         thorough = true;
     }
     trajectory_t pathlets = read_trajectory_from_file<space>(pathletsfilename);
@@ -221,7 +223,22 @@ int main(int argc, char** argv){
             auto duration = duration_cast<chrono::milliseconds>(end - start);
             std::cout << "TIME: "<<duration.count() << std::endl;
             //sampler.dump_sample_to_file(std::format("{}/roughvc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
-            break;
+            break; 
+        }
+        case sampling_mode::pathlet_aware_vc:{
+            auto start = chrono::high_resolution_clock::now();
+            sampler.generate_pathlet_aware_vc_dim_sample();
+            auto end = chrono::high_resolution_clock::now();
+            auto duration = duration_cast<chrono::milliseconds>(end - start);
+            std::cout << "TIME: "<<duration.count() << std::endl;
+        }
+        case sampling_mode::pathlet_aware_intersection_vc:{
+            auto start = chrono::high_resolution_clock::now();
+            sampler.generate_pathlet_aware_vc_dim_sample();
+            auto end = chrono::high_resolution_clock::now();
+            auto duration = duration_cast<chrono::milliseconds>(end - start);
+            std::cout << "TIME: "<<duration.count() << std::endl;
+
         }
     } 
 
