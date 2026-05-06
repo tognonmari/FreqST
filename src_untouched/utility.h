@@ -5,7 +5,7 @@
 #include <iostream>
 #include <optional>
 #include <type_traits>
-
+#include "roaring.hh"
 #include <ankerl/unordered_dense.h>
 
 #include "metric_space.h"
@@ -122,6 +122,236 @@ private:
 };
 
 } // namespace internal
+template <metric_space space>
+class RangeRoaringBitmap{
 
+        public:
+        using id_t = unsigned int;
+
+        RangeRoaringBitmap(){
+            roaring::Roaring temporary{};
+            range = std::move(temporary);
+        }
+        
+        RangeRoaringBitmap(int num_trajectories, std::set<id_t> range_ids): roaring_bitmap_id(std::numeric_limits<id_t>::max()) {
+            for (id_t tid : range_ids){
+
+                range.add(tid);
+                last_added = tid;
+            }
+        }
+
+        RangeRoaringBitmap(int num_trajectories, roaring::Roaring range_ids): roaring_bitmap_id(std::numeric_limits<id_t>::max()){
+            range= range_ids;
+        }
+
+        RangeRoaringBitmap(roaring::Roaring range_ids) : roaring_bitmap_id(std::numeric_limits<id_t>::max()){
+
+            range = range_ids;
+
+        }
+        
+        RangeRoaringBitmap(const roaring::Roaring& range_ids, id_t roaring_bitmap_id ): roaring_bitmap_id(roaring_bitmap_id){
+
+            range = range_ids;
+            //this-> roaring_bitmap_id = roaring_bitmap_id;
+
+        }
+
+        RangeRoaringBitmap(std::set<id_t> range_ids, id_t roaring_bitmap_id){
+            for (id_t tid : range_ids){
+
+                range.add(tid);
+
+            }
+            this-> roaring_bitmap_id = roaring_bitmap_id;
+        }
+
+        RangeRoaringBitmap(std::set<id_t> range_ids) : roaring_bitmap_id(std::numeric_limits<id_t>::max()){
+            for (id_t tid : range_ids){
+
+                range.add(tid);
+                last_added = tid;
+
+            }
+        }
+        /*
+        bool operator<(const RangeRoaringBitmap<space>& b) const {
+            const auto ca = range.cardinality();
+            const auto cb = b.range.cardinality();
+
+            if (ca != cb)
+                return ca < cb;
+
+            const auto amin = range.minimum();   // roaring provides this
+            const auto bmin = b.range.minimum();
+
+            if (amin != bmin)
+                return amin < bmin;
+
+            return range.maximum() < b.range.maximum();
+        }
+        
+        */
+
+        
+        bool operator<(const RangeRoaringBitmap<space>& b) const {
+            if (range.cardinality() != b.range.cardinality())
+                return range.cardinality() < b.range.cardinality();
+
+            auto ita = range.begin();
+            auto itb = b.range.begin();
+
+            for (; ita != range.end() && itb != b.range.end(); ++ita, ++itb) {
+                if (*ita != *itb)
+                    return *ita < *itb;
+            }
+
+            return false;
+        }
+        /*
+        
+        bool operator<(const RangeRoaringBitmap<space>& b)const {
+
+            //IF THEY HAVE THE SAME SIZE:
+            auto cthis = this->range.cardinality();
+            auto cb = b.range.cardinality();
+            if ( cthis == cb ){
+                
+                return std::lexicographical_compare(this->range.begin(), this->range.end(), b.range.begin(), b.range.end());
+            }
+            //IF THEY HAVE DIFFERENT SIZES
+            return cthis < cb;
+        }
+
+        */
+        bool operator==(const RangeRoaringBitmap<space>& other) const{
+
+            return this->range== other.range; //built in method of roaring class
+        }
+
+        int count() const{
+            return this->range.cardinality();
+        }
+
+        id_t get_range_id() const {
+
+            return this->roaring_bitmap_id;
+        }
+
+        void set_range_id(id_t range_id) {
+
+            this->roaring_bitmap_id = range_id;
+
+        }
+        // When invoked returns a vector with all the subsets of this with this.count()-1 bits 
+        std::set<RangeRoaringBitmap<space>> subsets_of_size_minus_one() const{
+            std::set<RangeRoaringBitmap> subsets;
+            for (auto tid : this->range){
+                RangeRoaringBitmap<space> subset(this->range);
+                subset.remove(tid);
+                subsets.insert(subset);
+            }
+            return subsets;
+        }
+        //for debugging purposes
+        /*
+        
+        std::string to_string() const {
+
+            std::string s;
+            boost::to_string(this->range, s);
+            return s;
+
+        }
+        */
+
+        RangeRoaringBitmap<space> operator|(const RangeRoaringBitmap& other ) const{
+
+            return RangeRoaringBitmap(this->range | other.range);
+
+        }
+
+        RangeRoaringBitmap<space> operator&(const RangeRoaringBitmap& other ){
+
+            return RangeRoaringBitmap(this->range & other.range);
+
+        }
+
+        RangeRoaringBitmap<space> operator&(const RangeRoaringBitmap& other ) const{
+
+            return RangeRoaringBitmap(this->range & other.range);
+
+        }
+
+        std::string to_string_readable() const{
+            
+            std::string s  = "";
+            for (auto& tid : this->range){
+
+                s+= std::format("{} ", tid);
+
+            }
+            
+            return s;
+
+        }
+
+        std::vector<id_t> to_vector() const{
+            std::vector<id_t> v;
+
+            for (auto tid: range){
+
+                v.push_back(tid);
+                last_added = tid;
+            }
+
+            return v;
+
+        }
+
+        roaring::Roaring get_range() const {
+            return this->range;
+        }
+
+        std::string to_string() const {
+
+            std::string s  = "";
+            for (auto tid : this->range){
+
+                s+= std::format("{} ", tid);
+
+            }
+            return s;
+
+
+        }
+
+        void add(id_t tid){
+            this->range.add(tid);
+            last_added = tid;
+        }
+
+        
+        void remove(id_t tid){
+            this->range.remove(tid);
+        }
+
+        void clear(){
+            this->range = roaring::Roaring{};
+        }
+
+        //Risky bit
+        roaring::Roaring range;
+    private:
+
+        
+
+        
+        id_t roaring_bitmap_id;
+        id_t last_added;
+
+};
+std::vector<int> POWERS_OF_TWO = {0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608, 16777216, 33554432, 67108864, 134217728, 268435456, 536870912};
 } // namespace frechet
 
