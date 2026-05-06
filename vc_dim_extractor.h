@@ -612,6 +612,8 @@ class vc_dim_extractor{
             */
             int n = elems.size();
             // Iterate over all non-empty subsets
+            /*
+            
             for (uint64_t mask = 1; mask < (1ULL << n); ++mask) {
                 
                 RangeRoaringBitmap<space> subset(std::set<id_t>{});
@@ -645,6 +647,51 @@ class vc_dim_extractor{
                 }
             }
             //std::cout<<std::format("Set {} is shattered.\n", candidate.to_string());
+            return true;
+            */
+            for (int k = n; k >= 1; --k) {
+                
+                uint64_t mask = (1ULL << k) - 1; //First mask (lowest possible with k 1s)
+                
+                while (mask < (1ULL << n)) {
+                    
+                    RangeRoaringBitmap<space> subset(std::set<id_t>{});
+                    for (int i = 0; i < n; ++i) {
+                        if (mask & (1ULL << i)) {
+                            subset.add(elems[i]);
+                        }
+                    }
+                    
+                    roaring::Roaring aggressively_filtered_ranges(inverted_index[*(subset.get_range().begin())]);
+                    
+                    for (const auto idd : subset.get_range()) {
+                        aggressively_filtered_ranges &= inverted_index[idd]; 
+                    }
+
+                    //std::cout << std::format("I am searching for a support for set {} while trying to shatter set {}, Aggressively filtered ranges have size {}\n", subset.to_string(), candidate.to_string(), aggressively_filtered_ranges.cardinality());
+                    bool found_a_range = false;
+                    
+                    // Check it is shattered
+                    for (const auto& range_idx : aggressively_filtered_ranges) {
+                        if ((candidate.range & ranges[range_idx].range) == subset.range) {
+                            //std::cout << std::format("Subset {} and range {} have intersection {}\n", subset.to_string(), range.to_string(), (subset & range ).to_string());
+                            found_a_range = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!found_a_range) {
+                        std::cout<< std::format("Set {} is not shattered because no range containing {} has intersection {} with {}. OUTPUTFALSE\n", candidate.to_string(), subset.to_string(), subset.to_string(), candidate.to_string());
+                        return false;
+                    }
+
+                    // Gosper trick
+                    uint64_t c = mask & -mask;
+                    uint64_t r = mask + c;
+                    mask = (((r ^ mask) >> 2) / c) | r;
+                }
+            }
+
             return true;
             
         };
