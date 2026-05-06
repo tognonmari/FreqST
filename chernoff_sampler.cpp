@@ -118,7 +118,11 @@ int main(int argc, char** argv){
     }
     trajectory_t pathlets = read_trajectory_from_file<space>(pathletsfilename);
     freq_subtrajectory_sampler<space> sampler(dataset, pathlets, epsilon, delta, radius, minimum_length, seed, grid_side_wrt_radius, thorough, inspect_higher_vectors);
-
+    std::cout << "DATASET: "<<infilename<< std::endl;
+    std::cout << "SAMPLING MODE: "<< ((int) mode) <<std::endl;
+    std::cout<< "RADIUS: "<< radius<< std::endl;
+    std::cout<< "GRID SIDE FACTOR: "<<grid_side_wrt_radius<< std::endl;
+    std::cout << "MIN LENGTH: "<< minimum_length << std::endl;
     sampler.fill_beginnings_of_pathlet_vector();
     std::cout << "PATHLETS: "<< sampler.get_pathlet_beginnings().size() << std::endl;
     if (thorough){
@@ -127,7 +131,7 @@ int main(int argc, char** argv){
     switch(mode){
         case sampling_mode::fixed_size:{
             sampler.generate_fixed_size_sample(fixed_size);
-            //sampler.dump_sample_to_file(std::format("{}/fixedsize_{}_{}.txt", outfiledir, fixed_size, seed));
+            sampler.dump_sample_to_file(std::format("{}/fixedsize_{}_{}.txt", outfiledir, fixed_size, seed));
             break;
         }
         case sampling_mode::chernoff:{

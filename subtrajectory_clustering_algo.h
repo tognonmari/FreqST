@@ -1,5 +1,5 @@
 #pragma once
-
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -18,6 +18,7 @@
 #include "subtrajectory_routine_rightstep.h"
 #include "trajectory.h"
 #include "freq_st_algo.h"
+namespace chrono = std::chrono;
 namespace frechet {
     
 template<metric_space m_space>
@@ -270,11 +271,11 @@ public:
             clustering_algos.emplace_back(std::make_unique<fixed_d_cluster>(trajectory, dist));
             std::cout<< "Finished Initializing cl algos for distance "<<dist << std::endl;
             candidate_clusters.emplace_back();
-            std::cout<< "Finished Initializing candidate clusters for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing candidate clusters for distance "<<dist << std::endl;
             gamma.emplace_back();
-            std::cout<< "Finished Initializing their ds for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing their ds for distance "<<dist << std::endl;
             max_freq_pathlets_by_distance.emplace_back();
-            std::cout<< "Finished Initializing for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing for distance "<<dist << std::endl;
         }
         std::cout<< "Initialized data structures for aided means clustering." << std::endl;
         //Do the sampling and initialization of the vector of frequent sts: we use the same chenoff sample?? For now, yes
@@ -288,7 +289,12 @@ public:
         range_search_t rs(sample);
         //float frequency_threshold = 0.05;
         frequent_subtrajectory_algo<space> temp_algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
+        auto start = chrono::high_resolution_clock::now();
         temp_algo.compute_maximal_frequent_pathlets();
+        auto stop =  chrono::high_resolution_clock::now();
+    
+        auto duration = duration_cast<chrono::milliseconds>(stop - start);
+        std::cout<< "TIME  FOR FP AT SQ DIST : "<< dist <<" IS "<< duration.count()<< std::endl;
         std::set<frequent_pathlet> temp_set(temp_algo.freq_pathlets.begin(), temp_algo.freq_pathlets.end());
         //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
         std::swap(temp_set, max_freq_pathlets_by_distance.at(sq_distances.size()-1));
@@ -306,7 +312,12 @@ public:
             range_search_t rs(sample);
             //float frequency_threshold = 0.05;
             frequent_subtrajectory_algo<space> algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
+            auto start = chrono::high_resolution_clock::now();
             algo.compute_maximal_frequent_pathlets();
+            auto stop =  chrono::high_resolution_clock::now();
+        
+            auto duration = duration_cast<chrono::milliseconds>(stop - start);
+            std::cout<< "TIME  FOR FP AT SQ DIST : "<< dist <<" IS "<< duration.count()<< std::endl;
             
             std::set<frequent_pathlet> temp(algo.freq_pathlets.begin(), algo.freq_pathlets.end());
 
@@ -440,13 +451,13 @@ public:
         for (const auto &dist: sq_distances) {
             std::cout<< "Initializing for distance "<<dist << std::endl;
             clustering_algos.emplace_back(std::make_unique<fixed_d_cluster>(trajectory, dist));
-            std::cout<< "Finished Initializing cl algos for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing cl algos for distance "<<dist << std::endl;
             candidate_clusters.emplace_back();
-            std::cout<< "Finished Initializing candidate clusters for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing candidate clusters for distance "<<dist << std::endl;
             gamma.emplace_back();
-            std::cout<< "Finished Initializing their ds for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing their ds for distance "<<dist << std::endl;
             max_freq_pathlets_by_distance.emplace_back();
-            std::cout<< "Finished Initializing for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing for distance "<<dist << std::endl;
         }
         std::cout<< "Initialized data structures for aided means clustering." << std::endl;
         //Do the sampling and initialization of the vector of frequent sts: we use the same chenoff sample?? For now, yes
@@ -460,7 +471,12 @@ public:
         range_search_t rs(sample);
         //float frequency_threshold = 0.05;
         frequent_subtrajectory_algo<space> temp_algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
+        auto start = chrono::high_resolution_clock::now();
         temp_algo.compute_maximal_frequent_pathlets();
+        auto stop =  chrono::high_resolution_clock::now();
+    
+        auto duration = duration_cast<chrono::milliseconds>(stop - start);
+        std::cout<< "TIME  FOR FP AT SQ DIST : "<< dist <<" IS "<< duration.count()<< std::endl;
         std::set<frequent_pathlet> temp_set(temp_algo.freq_pathlets.begin(), temp_algo.freq_pathlets.end());
         //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
         std::swap(temp_set, max_freq_pathlets_by_distance.at(sq_distances.size()-1));
@@ -478,7 +494,12 @@ public:
             range_search_t rs(sample);
             //float frequency_threshold = 0.05;
             frequent_subtrajectory_algo<space> algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
+            auto start = chrono::high_resolution_clock::now();
             algo.compute_maximal_frequent_pathlets();
+            auto stop =  chrono::high_resolution_clock::now();
+        
+            auto duration = duration_cast<chrono::milliseconds>(stop - start);
+            std::cout<< "TIME  FOR FP AT SQ DIST : "<< dist <<" IS "<< duration.count()<< std::endl;
             
             std::set<frequent_pathlet> temp(algo.freq_pathlets.begin(), algo.freq_pathlets.end());
 
@@ -615,13 +636,13 @@ public:
         for (const auto &dist: sq_distances) {
             std::cout<< "Initializing for distance "<<dist << std::endl;
             clustering_algos.emplace_back(std::make_unique<fixed_d_cluster>(trajectory, dist));
-            std::cout<< "Finished Initializing cl algos for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing cl algos for distance "<<dist << std::endl;
             candidate_clusters.emplace_back();
-            std::cout<< "Finished Initializing candidate clusters for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing candidate clusters for distance "<<dist << std::endl;
             gamma.emplace_back();
-            std::cout<< "Finished Initializing their ds for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing their ds for distance "<<dist << std::endl;
             max_freq_pathlets_by_distance.emplace_back();
-            std::cout<< "Finished Initializing for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing for distance "<<dist << std::endl;
         }
         first_uncovered_pathlet_by_distance.reserve(sq_distances.size());
         std::cout<< "Initialized data structures for aided means clustering." << std::endl;
@@ -636,7 +657,12 @@ public:
         range_search_t rs(sample);
         //float frequency_threshold = 0.05;
         frequent_subtrajectory_algo<space> temp_algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
+        auto start = chrono::high_resolution_clock::now();
         temp_algo.compute_maximal_frequent_pathlets();
+        auto stop =  chrono::high_resolution_clock::now();
+    
+        auto duration = duration_cast<chrono::milliseconds>(stop - start);
+        std::cout<< "TIME  FOR FP AT SQ DIST : "<< dist <<" IS "<< duration.count()<< std::endl;
         //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
         std::swap(temp_algo.freq_pathlets, max_freq_pathlets_by_distance.at(sq_distances.size()-1));
         //TODO:this should not be a vector, but a hashmap, must be modified in pathlet tree etc... Unluckily simply changing this ds: Keep both of them for now
@@ -660,7 +686,12 @@ public:
             range_search_t rs(sample);
             //float frequency_threshold = 0.05;
             frequent_subtrajectory_algo<space> algo(sample, rs, infilename, frequency_threshold, radius); //infilename needs to be passed as parameter to the clustering algorithm
+            auto start = chrono::high_resolution_clock::now();
             algo.compute_maximal_frequent_pathlets();
+            auto stop =  chrono::high_resolution_clock::now();
+        
+            auto duration = duration_cast<chrono::milliseconds>(stop - start);
+            std::cout<< "TIME  FOR FP AT SQ DIST : "<< dist <<" IS "<< duration.count()<< std::endl;
             
             //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
             std::swap(algo.freq_pathlets, max_freq_pathlets_by_distance.at(i));
@@ -791,13 +822,13 @@ public:
         for (const auto &dist: sq_distances) {
             std::cout<< "Initializing for distance "<<dist << std::endl;
             clustering_algos.emplace_back(std::make_unique<fixed_d_cluster>(trajectory, dist)); 
-            std::cout<< "Finished Initializing cl algos for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing cl algos for distance "<<dist << std::endl;
             candidate_clusters.emplace_back();
-            std::cout<< "Finished Initializing candidate clusters for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing candidate clusters for distance "<<dist << std::endl;
             gamma.emplace_back();
-            std::cout<< "Finished Initializing their ds for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing their ds for distance "<<dist << std::endl;
             max_freq_pathlets_by_distance.emplace_back();
-            std::cout<< "Finished Initializing for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing for distance "<<dist << std::endl;
         }
         first_uncovered_pathlet_by_distance.reserve(sq_distances.size());
         std::cout<< "Initialized data structures for aided means clustering." << std::endl;
@@ -810,8 +841,13 @@ public:
         double radius = std::sqrt(dist);
         range_search_t rs(sample);
         //float frequency_threshold = 0.05;
-        frequent_subtrajectory_algo_simplified<space> temp_algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor, this->efficacy_factors); //infilename needs to be passed as parameter to the clustering algorithm
+        frequent_subtrajectory_algo_simplified<space> temp_algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
+        auto start = chrono::high_resolution_clock::now();
         temp_algo.compute_maximal_frequent_pathlets();
+        auto stop =  chrono::high_resolution_clock::now();
+    
+        auto duration = duration_cast<chrono::milliseconds>(stop - start);
+        std::cout<< "TIME  FOR FP AT SQ DIST : "<< dist <<" IS "<< duration.count()<< std::endl;
         temp_algo.unsimplify_collected_pathlets(this->trajectory);
         //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
         std::swap(temp_algo.freq_pathlets, max_freq_pathlets_by_distance.at(sq_distances.size()-1));
@@ -836,7 +872,13 @@ public:
             range_search_t rs(sample);
             //float frequency_threshold = 0.05;
             frequent_subtrajectory_algo_simplified<space> algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor, this->efficacy_factors); //infilename needs to be passed as parameter to the clustering algorithm
+            frequent_subtrajectory_algo_simplified<space> algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
+            auto start = chrono::high_resolution_clock::now();
             algo.compute_maximal_frequent_pathlets();
+            auto stop =  chrono::high_resolution_clock::now();
+        
+            auto duration = duration_cast<chrono::milliseconds>(stop - start);
+            std::cout<< "TIME  FOR FP AT SQ DIST : "<< dist <<" IS "<< duration.count()<< std::endl;
             algo.unsimplify_collected_pathlets(this->trajectory);
             //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
             std::swap(algo.freq_pathlets, max_freq_pathlets_by_distance.at(i));
@@ -986,13 +1028,13 @@ public:
         for (const auto &dist: sq_distances) {
             std::cout<< "Initializing for distance "<<dist << std::endl;
             clustering_algos.emplace_back(std::make_unique<fixed_d_cluster>(trajectory, dist)); 
-            std::cout<< "Finished Initializing cl algos for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing cl algos for distance "<<dist << std::endl;
             candidate_clusters.emplace_back();
-            std::cout<< "Finished Initializing candidate clusters for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing candidate clusters for distance "<<dist << std::endl;
             gamma.emplace_back();
-            std::cout<< "Finished Initializing their ds for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing their ds for distance "<<dist << std::endl;
             max_freq_pathlets_by_distance.emplace_back();
-            std::cout<< "Finished Initializing for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing for distance "<<dist << std::endl;
         }
         first_uncovered_pathlet_by_distance.reserve(sq_distances.size());
         std::cout<< "Initialized data structures for aided means clustering." << std::endl;
@@ -1006,9 +1048,15 @@ public:
         range_search_t rs(sample);
         //float frequency_threshold = 0.05;
         frequent_subtrajectory_algo_simplified<space> temp_algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor, this->efficacy_factors, true); //infilename needs to be passed as parameter to the clustering algorithm
+        frequent_subtrajectory_algo_simplified<space> temp_algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
+        auto start = chrono::high_resolution_clock::now();
         temp_algo.compute_maximal_frequent_pathlets();
         frechet::internal::curve_simplification<space> simpl_original_traj{this->trajectory, radius, simplification_factor};
         //temp_algo.compute_gamma_for_collected_pathlets(simpl_original_traj.trajectory());
+        auto stop =  chrono::high_resolution_clock::now();
+    
+        auto duration = duration_cast<chrono::milliseconds>(stop - start);
+        std::cout<< "TIME  FOR FP AT SQ DIST : "<< dist <<" IS "<< duration.count()<< std::endl;
         temp_algo.unsimplify_collected_pathlets(this->trajectory);
         //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
         std::swap(temp_algo.freq_pathlets, max_freq_pathlets_by_distance.at(sq_distances.size()-1));
@@ -1034,9 +1082,15 @@ public:
             range_search_t rs(sample);
             //float frequency_threshold = 0.05;
             frequent_subtrajectory_algo_simplified<space> algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor, this->efficacy_factors, true); //infilename needs to be passed as parameter to the clustering algorithm
+            frequent_subtrajectory_algo_simplified<space> algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
+            auto start = chrono::high_resolution_clock::now();
             algo.compute_maximal_frequent_pathlets();
             frechet::internal::curve_simplification<space> simpl_original_traj{this->trajectory, radius, simplification_factor};
             //algo.compute_gamma_for_collected_pathlets(simpl_original_traj.trajectory());
+            auto stop =  chrono::high_resolution_clock::now();
+        
+            auto duration = duration_cast<chrono::milliseconds>(stop - start);
+            std::cout<< "TIME  FOR FP AT SQ DIST : "<< dist <<" IS "<< duration.count()<< std::endl;
             algo.unsimplify_collected_pathlets(this->trajectory);
             //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
             std::swap(algo.freq_pathlets, max_freq_pathlets_by_distance.at(i));
@@ -1192,11 +1246,11 @@ public:
             clustering_algos.emplace_back(std::make_unique<fixed_d_cluster>(trajectory, dist)); 
             std::cout<< "Finished Initializing cl algos for distance "<<dist << std::endl;
             candidate_clusters.emplace_back();
-            std::cout<< "Finished Initializing candidate clusters for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing candidate clusters for distance "<<dist << std::endl;
             gamma.emplace_back();
-            std::cout<< "Finished Initializing their ds for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing their ds for distance "<<dist << std::endl;
             max_freq_pathlets_by_distance.emplace_back();
-            std::cout<< "Finished Initializing for distance "<<dist << std::endl;
+            //std::cout<< "Finished Initializing for distance "<<dist << std::endl;
         }
         std::cout<< "Initialized data structures for aided means clustering." << std::endl;
         
@@ -1210,10 +1264,16 @@ public:
         //float frequency_threshold = 0.05;
         auto initial = std::chrono::high_resolution_clock::now();
         frequent_subtrajectory_algo_simplified<space> temp_algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor, this->efficacy_factors, true); //infilename needs to be passed as parameter to the clustering algorithm
+        frequent_subtrajectory_algo_simplified<space> temp_algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
+        auto start = chrono::high_resolution_clock::now();
         temp_algo.compute_maximal_frequent_pathlets();
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::seconds>(end-initial);
         std::cout << "it took me this much in (seconds) to compute FP "<<duration <<std::endl;
+        auto stop =  chrono::high_resolution_clock::now();
+    
+        auto duration = duration_cast<chrono::milliseconds>(stop - start);
+        std::cout<< "TIME  FOR FP AT SQ DIST : "<< dist <<" IS "<< duration.count()<< std::endl;
         temp_algo.unsimplify_collected_pathlets(this->trajectory);
         std::set<frequent_pathlet> temp_set(temp_algo.freq_pathlets.begin(), temp_algo.freq_pathlets.end());
         //Now algo.freq_pathlets contains pathelts encoded according to the original trajectory
@@ -1232,7 +1292,13 @@ public:
             range_search_t rs(sample);
             //float frequency_threshold = 0.05;
             frequent_subtrajectory_algo_simplified<space> algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor, this->efficacy_factors, true); //infilename needs to be passed as parameter to the clustering algorithm
+            frequent_subtrajectory_algo_simplified<space> algo(sample, rs, infilename, frequency_threshold, radius, simplification_factor); //infilename needs to be passed as parameter to the clustering algorithm
+            auto start = chrono::high_resolution_clock::now();
             algo.compute_maximal_frequent_pathlets();
+            auto stop =  chrono::high_resolution_clock::now();
+        
+            auto duration = duration_cast<chrono::milliseconds>(stop - start);
+            std::cout<< "TIME  FOR FP AT SQ DIST : "<< dist <<" IS "<< duration.count()<< std::endl;
             algo.unsimplify_collected_pathlets(this->trajectory);
             std::set<frequent_pathlet> temp(algo.freq_pathlets.begin(), algo.freq_pathlets.end());
 

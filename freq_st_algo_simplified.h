@@ -679,6 +679,8 @@ class frequent_subtrajectory_algo_simplified{
                         continue;
 
                     }
+
+                    int count = fsg.query_one_pathlet_over_the_sample_with_labels(sample, pn.getPathlet(), this->integer_frequency_threshold); //SF IS HERE
                     int count = 0;
                     if (pruning_enabled){
                         count = fsg.query_one_pathlet_over_the_sample_with_labels(sample, pn.getPathlet(), integer_frequency_threshold);

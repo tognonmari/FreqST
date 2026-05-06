@@ -493,7 +493,7 @@ class vc_dim_extractor{
                 std::vector<RangeRoaringBitmap<space>> local_candidates;
                 std::vector<RangeRoaringBitmap<space>> temporary_candidates;
                 int local_generations = 0;
-                #pragma omp for schedule(dynamic, 32)
+                #pragma omp for schedule(dynamic,1)
                 for (int i = 0; i< children_to_explore.size(); i++){
                     
                     auto& [key, value] = *(children_to_explore[i]);
@@ -579,10 +579,11 @@ class vc_dim_extractor{
             roaring::Roaring trajectory_ids = candidate.get_range();
             roaring::Roaring filtered_ranges;
             //roaring::Roaring filtered_ranges;
+            std::vector<id_t> elems;
             //std::cout<< std::format("--------------checking shattering for set {}, for which i need {} sets. \n", candidate.to_string(), POWERS_OF_TWO[candidate.count()+1]-1);
             for (auto it = trajectory_ids.begin(); it != trajectory_ids.end(); ++it) {
-                
-                filtered_ranges |= inverted_index[*it];
+                elems.push_back(*it);
+                //filtered_ranges |= inverted_index[*it];
             }
             //std::cout << "FILTERED RANGES: \n";
             //for (const auto item: filtered_ranges){
@@ -590,6 +591,7 @@ class vc_dim_extractor{
             //    std::cout << ranges[item].to_string()<< "\n";
 
             //}
+            /*
             std::set<RangeRoaringBitmap<space>> found_ranges;
             
             for (const auto item : filtered_ranges ){
@@ -607,7 +609,8 @@ class vc_dim_extractor{
             }
             
             return false;
-            /*
+            */
+            int n = elems.size();
             // Iterate over all non-empty subsets
             for (uint64_t mask = 1; mask < (1ULL << n); ++mask) {
                 
@@ -642,7 +645,7 @@ class vc_dim_extractor{
             }
             //std::cout<<std::format("Set {} is shattered.\n", candidate.to_string());
             return true;
-            */
+            
         };
         static void generate_pairs_by_enumeration(Trie& T_2, std::map<RangeRoaringBitmap<space>, transaction_set_data>& F_2,std::map<RangeRoaringBitmap<space>, transaction_set_data>& F_1,std::vector<roaring::Roaring> inverted_index, int threads){
 

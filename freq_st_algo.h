@@ -363,11 +363,11 @@ class freq_subtrajectory_sampler{
             int total_distances = 0;
             float squared_distance_threshold = distance_threshold*distance_threshold;
             for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-                if(i%10000 == 0){
+                //if(i%10000 == 0){
                     
-                std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+                //std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
 
-                }
+                //}
                 if(the_trajectory.get_id_at(i) == last_seen_trajectory){
                     
                     
@@ -484,11 +484,11 @@ class freq_subtrajectory_sampler{
             int total_distances = 0;
             float squared_distance_threshold = distance_threshold*distance_threshold;
             for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-                if(i%10000 == 0){
+                //if(i%10000 == 0){
                     
-                std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+                //std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
 
-                }
+                //}
                 if(the_trajectory.get_id_at(i) == last_seen_trajectory){
                     
                     
@@ -605,17 +605,17 @@ class freq_subtrajectory_sampler{
             std::set<index_t> traj_set_ends;
             float squared_distance_threshold = distance_threshold *distance_threshold;
             for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-                if(i%10000 == 0){
+                //if(i%10000 == 0){
                     
-                std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+                //std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
 
-                }
+                //}
                 if(the_trajectory.get_id_at(i) == last_seen_trajectory){
 
                     point_t point = the_trajectory[i];
                     
 
-                    for (const auto idx: search.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
 
                         traj_set_beginnings.insert(idx);
 
@@ -693,7 +693,7 @@ class freq_subtrajectory_sampler{
                     */
                     last_seen_trajectory = the_trajectory.get_id_at(i);
                     //add info for the current point
-                    for (const auto idx: search.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
 
                         traj_set_beginnings.insert(idx);
 
@@ -1114,13 +1114,13 @@ class freq_subtrajectory_sampler{
         }
         std::vector<id_t> indexes;
         int n = the_trajectory.num_trajectories();
-        for (int i = 0; i< n; i++){
+        for (int i = 1; i< n; i++){
 
             indexes.push_back(i);
 
         }
-        auto rng = std::default_random_engine {this->seed};
-        std::ranges::shuffle(indexes, rng);
+        
+        std::ranges::shuffle(indexes, this->mt);
         // Extract sampled ids
         for (int i = 0; i < sample_size; i++){
 
@@ -1180,11 +1180,13 @@ class freq_subtrajectory_sampler{
                 }
                 std::sort(counters.begin(), counters.end(), std::greater<>());
                 float mean = std::reduce(counters.begin(), counters.end()) / ((float)(counters.size()));
-                std::cout << "=====================\n";
+                float empirical_variance = std::transform_reduce(counters.begin(), counters.end(), 0.0, std::plus<>(), [&](int x) {return (x-mean)*(x-mean);})/ ((float)(counters.size()-1));
+                std::cout << "********************************\n";
                 std::cout << std::format("TRANSACTION : {}\n", pair.traj_id);
                 std::cout << std::format("NUMBER OF REPORTED POINTS : {}\n", replica.size());
                 std::cout << std::format("AVERAGE NUMBER OF REPETITIONS : {}\n", mean);
-                std::cout << std::format("TOP 3 NUMBER OF REPETITIONS : {}, {}, {}\n", counters.at(0), counters.at(1), counters.at(2) );
+
+                std::cout << std::format("TOP 5 NUMBER OF REPETITIONS : {}, {}, {}, {}, {}\n", counters.at(0), counters.at(1), counters.at(2), counters.at(3), counters.at(4) );
 
             }
 
@@ -1273,10 +1275,10 @@ class frequent_subtrajectory_algo{
             this->sample = sampled_traj; //I keep the original sample, I will build the simplification later in the constructor
             this->dataset_location = dataset_file;
             this->output_config = configs;
-            std::cout << sampled_traj.num_trajectories_not_consecutive()<< std::endl;
-            std::cout<<"Frequency threshold is "<< frequency_threshold << std::endl;
+            //std::cout << sampled_traj.num_trajectories_not_consecutive()<< std::endl;
+            //std::cout<<"Frequency threshold is "<< frequency_threshold << std::endl;
             this->integer_frequency_threshold = ceil(frequency_threshold *((int)sampled_traj.num_trajectories_not_consecutive()));
-            std::cout << "THE INTEGER FREQ THRESHOLD IS "<< this->integer_frequency_threshold<<std::endl;
+            //std::cout << "THE INTEGER FREQ THRESHOLD IS "<< this->integer_frequency_threshold<<std::endl;
             this-> last_parsed_trajectory = -1;
             this-> distance_threshold = distance_thresh;
             for (int i=0; i<25; i++){
