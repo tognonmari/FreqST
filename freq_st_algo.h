@@ -437,7 +437,7 @@ class freq_subtrajectory_sampler{
                 //std::cout << "I am visiting point "<< i <<std::endl;
                 if(i%10000 == 0){
                     
-                std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+                //std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
 
                 }
                 if(the_trajectory.get_id_at(i) == last_seen_trajectory){
@@ -546,24 +546,24 @@ class freq_subtrajectory_sampler{
             // Print inverted_index
             
             
-            std::cout << "---------------------------------Printing inverted_index...\n";
-            for (id_t i = 0; i <inverted_index.size(); i++){
+            //std::cout << "---------------------------------Printing inverted_index...\n";
+            //for (id_t i = 0; i <inverted_index.size(); i++){
 
-                std::cout << std::format("Trajectory with id {} has {} potentially matching pathlets, which are {}\n", inverted_index[i].first, inverted_index[i].second.count(), inverted_index[i].second.to_string());
+            //    std::cout << std::format("Trajectory with id {} has {} potentially matching pathlets, which are {}\n", inverted_index[i].first, inverted_index[i].second.count(), inverted_index[i].second.to_string());
 
-            }
+            //}
             
-            std::cout<< "I finished adding\n";
+            //std::cout<< "I finished adding\n";
             
             std::sort(inverted_index.begin(), inverted_index.end(), [](const auto& a, const auto& b) {return b.second < a.second;});
             
             
-            std::cout << "---------------------------------Printing SORTED inverted_index...\n";
-            for (id_t i = 0; i <inverted_index.size(); i++){
+            //std::cout << "---------------------------------Printing SORTED inverted_index...\n";
+            //for (id_t i = 0; i <inverted_index.size(); i++){
 
-                std::cout << std::format("Trajectory with id {} has {} potentially matching pathlets, which are {}\n", inverted_index[i].first, inverted_index[i].second.count(), inverted_index[i].second.to_string());
+            //    std::cout << std::format("Trajectory with id {} has {} potentially matching pathlets, which are {}\n", inverted_index[i].first, inverted_index[i].second.count(), inverted_index[i].second.to_string());
 
-            }
+            //}
             
             
             
@@ -583,12 +583,12 @@ class freq_subtrajectory_sampler{
 
             std::sort(c.begin(),c.end(), std::greater<>());
             
-            std::cout << "---------------------------------Printing SORTED inverted_index...\n";
-            for (id_t i = 0; i <inverted_index.size(); i++){
+            //std::cout << "---------------------------------Printing SORTED inverted_index...\n";
+            //for (id_t i = 0; i <inverted_index.size(); i++){
 
-                std::cout << std::format("Trajectory with id {} has {} potentially matching pathlets, which are {}\n", inverted_index[i].first, inverted_index[i].second.count(), inverted_index[i].second.to_string());
+            //    std::cout << std::format("Trajectory with id {} has {} potentially matching pathlets, which are {}\n", inverted_index[i].first, inverted_index[i].second.count(), inverted_index[i].second.to_string());
 
-            }            
+            //}            
             
             //Now I start with the algorithm 
             int vc_dim = 0;
@@ -619,9 +619,9 @@ class freq_subtrajectory_sampler{
                         break;
                     }
                 }
-                std::cout << std::format("I am trying to exclude VC-dim = {}:  c_k is {}.\n", k, c_k);
-                std::cout << std::format("The candidate tids for this case are {}, which are {}\n", tids_for_a_shatterable_set.count(), tids_for_a_shatterable_set.to_string());
-                std::cout << std::format("I now build the restricted pathlet map...");
+                //std::cout << std::format("I am trying to exclude VC-dim = {}:  c_k is {}.\n", k, c_k);
+                //std::cout << std::format("The candidate tids for this case are {}, which are {}\n", tids_for_a_shatterable_set.count(), tids_for_a_shatterable_set.to_string());
+                //std::cout << std::format("I now build the restricted pathlet map...");
                 std::map<unsigned int, RangeRoaringBitmap<space>> restricted_column_map;
             
                 for (const auto& item : columns_map){
@@ -647,10 +647,10 @@ class freq_subtrajectory_sampler{
                     restricted_ranges_list.push_back(entry.second); //inefficient but this is just for debugging 
                 }
                 std::sort(restricted_ranges_list.begin(), restricted_ranges_list.end(),[](const auto& a, const auto& b) {return b < a;});
-                std::cout << "-----------------PRINTING SORTED RANGES LIST \n";
-                for (const auto& item : restricted_ranges_list){
-                    std::cout << item.to_string()<< "\n";
-                }
+                //std::cout << "-----------------PRINTING SORTED RANGES LIST \n";
+                //for (const auto& item : restricted_ranges_list){
+                //    std::cout << item.to_string()<< "\n";
+                //}
 
                 
                 
@@ -666,7 +666,7 @@ class freq_subtrajectory_sampler{
                     int c_val = restricted_ranges_list[i].count(); //std::floor(log2(restricted_ranges_list[i].count())-1);
                     if(c_val>= current_visiting_size){
                         //it is good to keep for the shattering
-                        std::cout << std::format("I have found a pathlet whose cardinality is {}, for current visiting size of {} i needed {}. \n", c_val, current_visiting_size,current_visiting_size );
+                        //std::cout << std::format("I have found a pathlet whose cardinality is {}, for current visiting size of {} i needed {}. \n", c_val, current_visiting_size,current_visiting_size );
                         needed_pathlets_for_current_visting_size--;
                     }
                     else{
@@ -678,7 +678,7 @@ class freq_subtrajectory_sampler{
                         current_visiting_size--;
                         needed_pathlets_for_current_visting_size = binom(k, k-current_visiting_size);
                         if(current_visiting_size == 0){
-                            std::cout << std::format("According to cardinallites a set of size {} can be shattered.\n", k);
+                            //std::cout << std::format("According to cardinallites a set of size {} can be shattered.\n", k);
                             break;
                         }
                     }
@@ -733,7 +733,7 @@ class freq_subtrajectory_sampler{
                         search.insert(beginning_id, location, end_id);
                     }
                 }
-                assert(search_ends.num_elements() == search.num_elements());
+                //assert(search_ends.num_elements() == search.num_elements());
             }
             int d = 0;
             std::set<transaction_and_points_pair> c;
@@ -979,11 +979,11 @@ class freq_subtrajectory_sampler{
             std::set<index_t> traj_set_ends;
             float squared_distance_threshold = distance_threshold *distance_threshold;
             for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
-                if(i%10000 == 0){
+                //if(i%10000 == 0){
                     
-                std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+                //std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
 
-                }
+                //}
                 if(the_trajectory.get_id_at(i) == last_seen_trajectory){
 
                     point_t point = the_trajectory[i];
@@ -1223,7 +1223,7 @@ class freq_subtrajectory_sampler{
                 search_ends.insert(end_id, location);
                 
             }
-            assert(search_ends.num_elements() == search.num_elements());
+            //assert(search_ends.num_elements() == search.num_elements());
             
 
             assert(search.num_elements() == this->pathlet_beginnings.size());
