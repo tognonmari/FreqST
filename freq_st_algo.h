@@ -647,21 +647,22 @@ class freq_subtrajectory_sampler{
                     restricted_ranges_list.push_back(entry.second); //inefficient but this is just for debugging 
                 }
                 std::sort(restricted_ranges_list.begin(), restricted_ranges_list.end(),[](const auto& a, const auto& b) {return b < a;});
-                //std::cout << "-----------------PRINTING SORTED RANGES LIST \n";
-                //for (const auto& item : restricted_ranges_list){
-                //    std::cout << item.to_string()<< "\n";
-                //}
+                std::cout << "-----------------PRINTING SORTED RANGES LIST \n";
+                for (const auto& item : restricted_ranges_list){
+                    std::cout << item.to_string()<< "\n";
+                }
                 // Now the first items in restricted_ranges_list will be sorted in decreasing order. 
                 // If the cardinalities can carry a set of size k...  
                 int reserved_pathlets_for_current_visiting_size = 0;
                 int current_visiting_size = k;
                 int needed_pathlets_for_current_visting_size = binom(k, k-current_visiting_size);
+                
                 bool unshatterable = false;
                 for (int i = 0; i< restricted_ranges_list.size(); i++){
                     int c_val = restricted_ranges_list[i].count(); //std::floor(log2(restricted_ranges_list[i].count())-1);
                     if(c_val>= current_visiting_size){
                         //it is good to keep for the shattering
-                        //std::cout << std::format("I have found a pathlet whose cardinality is {}, for current visiting size of {} i needed {}. \n", c_val, current_visiting_size,POWERS_OF_TWO[current_visiting_size+1]-1 );
+                        std::cout << std::format("I have found a pathlet whose cardinality is {}, for current visiting size of {} i needed {}. \n", c_val, current_visiting_size,POWERS_OF_TWO[current_visiting_size+1]-1 );
                         needed_pathlets_for_current_visting_size--;
                     }
                     else{
@@ -673,7 +674,7 @@ class freq_subtrajectory_sampler{
                         current_visiting_size--;
                         needed_pathlets_for_current_visting_size = binom(k, k-current_visiting_size);
                         if(current_visiting_size == 0){
-                            //std::cout << std::format("According to cardinallites a set of size {} can be shattered.\n", k);
+                            std::cout << std::format("According to cardinallites a set of size {} can be shattered.\n", k);
                             break;
                         }
                     }
@@ -683,7 +684,7 @@ class freq_subtrajectory_sampler{
 
                 }
                 
-                if(unshatterable || c_k == 0){
+                if(unshatterable || c_k == 0 || current_visiting_size>0 ){
                     
                     std::cout<< std::format("With the restricted pathlets I cannot shatter a set with cardinality as large as {}. Hence, I can try the lower value as a better upper bound.\n", k);
                     k--;
