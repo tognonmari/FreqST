@@ -149,7 +149,7 @@ class freq_subtrajectory_sampler{
                     last_iter = true;
                 }
                 trajectory_t pathlet_mother = the_pathlets.slice_trajectory_by_id(current_visiting_id);
-                BinaryPathletTree pathlet_tree(pathlet_mother, current_visiting_id, floor(log2(pathlet_mother.total_size())) + 1,1);
+                BinaryPathletTree pathlet_tree(pathlet_mother, current_visiting_id, floor(log2(pathlet_mother.total_size())) + 1,min_length);
                 //For debugging purposes: print the tree
                 //std::cout<< "Pathelet tree for tid "<< current_visiting_id<< std::endl;
                 //std::cout << pathlet_tree.toString()<< std::endl;
@@ -382,7 +382,7 @@ class freq_subtrajectory_sampler{
 
             if(thorough && min_length >=3){
                 //Informative insertion 
-                for (const auto& pair : this->pathlet_beginnings){
+                for (const auto& pair : this->pathlet_ends){
                     index_t beginning_id = pair.first;
                     point_t location = pair.second.first;
                     for (auto end_id :  pair.second.second){
@@ -651,6 +651,10 @@ class freq_subtrajectory_sampler{
                 for (const auto& item : restricted_ranges_list){
                     std::cout << item.to_string()<< "\n";
                 }
+
+                
+                
+
                 // Now the first items in restricted_ranges_list will be sorted in decreasing order. 
                 // If the cardinalities can carry a set of size k...  
                 int reserved_pathlets_for_current_visiting_size = 0;
@@ -662,7 +666,7 @@ class freq_subtrajectory_sampler{
                     int c_val = restricted_ranges_list[i].count(); //std::floor(log2(restricted_ranges_list[i].count())-1);
                     if(c_val>= current_visiting_size){
                         //it is good to keep for the shattering
-                        std::cout << std::format("I have found a pathlet whose cardinality is {}, for current visiting size of {} i needed {}. \n", c_val, current_visiting_size,POWERS_OF_TWO[current_visiting_size+1]-1 );
+                        std::cout << std::format("I have found a pathlet whose cardinality is {}, for current visiting size of {} i needed {}. \n", c_val, current_visiting_size,current_visiting_size );
                         needed_pathlets_for_current_visting_size--;
                     }
                     else{
@@ -957,15 +961,15 @@ class freq_subtrajectory_sampler{
             
             range_search_t search_ends{the_pathlets[0], grid_side_factor*distance_threshold};
 
-            if(thorough && min_length >=3){
-                for (const auto& pair : this->pathlet_ends){
-                    point_t location = pair.second.first;
-                    index_t end_id = pair.first;
-                    search_ends.insert(end_id, location);
-                    
-                }
-                //assert(search_ends.num_elements() == search.num_elements());
+            //if(thorough && min_length >=3){
+            for (const auto& pair : this->pathlet_ends){
+                point_t location = pair.second.first;
+                index_t end_id = pair.first;
+                search_ends.insert(end_id, location);
+                
             }
+                //assert(search_ends.num_elements() == search.num_elements());
+            //}
 
             assert(search.num_elements() == this->pathlet_beginnings.size());
             
@@ -1003,16 +1007,17 @@ class freq_subtrajectory_sampler{
                 else{
                     
                     // Append the result up to now to c
-                    if(thorough && min_length >=3){
-                        c.push_back(floor(log2(std::accumulate(traj_set_beginnings.begin(),traj_set_beginnings.end(),size_t{0},[&](size_t acc, const auto& kv){return acc + std::count_if(kv.second.begin(),kv.second.end(),[&](const auto& v){return traj_set_ends.contains(v);});})) + 1));
+                    //if(thorough && min_length >=3){
+                    int num_distinct_pathlets = hierarchical_counting(traj_set_beginnings, traj_set_ends);
+                    c.push_back(floor(log2(num_distinct_pathlets) + 1));
 
-                    }
-                    else{
+                    //}
+                    //else{
                         
-                        int num_distinct_pathlets = std::accumulate(traj_set_beginnings.begin(),traj_set_beginnings.end(),size_t{0},[&](size_t acc, const auto& kv){return acc + kv.second.size();});
+                    //    int num_distinct_pathlets = std::accumulate(traj_set_beginnings.begin(),traj_set_beginnings.end(),size_t{0},[&](size_t acc, const auto& kv){return acc + kv.second.size();});
                         //std::cout << std::format("Trajectory {} is close to {} pathlet beginnings and in this case to {} distinct pathlets.\n", last_seen_trajectory, traj_set_beginnings.size(), num_distinct_pathlets);
-                        c.push_back(floor(log2(num_distinct_pathlets) + 1));
-                    }
+                    //    c.push_back(floor(log2(num_distinct_pathlets) + 1));
+                    //}
                     
                     //initialize the set again 
                     traj_set_beginnings.clear();
@@ -1025,15 +1030,15 @@ class freq_subtrajectory_sampler{
 
                     }
 
-                    if(thorough && min_length >=3){
+                    
 
-                        for (const auto idx: search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
 
-                            traj_set_ends.insert(idx);
-
-                        }
+                        traj_set_ends.insert(idx);
 
                     }
+
+                    
                 }
 
             }
@@ -1211,15 +1216,15 @@ class freq_subtrajectory_sampler{
             
             range_search_t search_ends{the_pathlets[0], grid_side_factor*distance_threshold};
 
-            if(thorough && min_length >=3){
-                for (const auto& pair : this->pathlet_ends){
-                    point_t location = pair.second.first;
-                    index_t end_id = pair.first;
-                    search_ends.insert(end_id, location);
-                    
-                }
-                assert(search_ends.num_elements() == search.num_elements());
+            
+            for (const auto& pair : this->pathlet_ends){
+                point_t location = pair.second.first;
+                index_t end_id = pair.first;
+                search_ends.insert(end_id, location);
+                
             }
+            assert(search_ends.num_elements() == search.num_elements());
+            
 
             assert(search.num_elements() == this->pathlet_beginnings.size());
             
@@ -1245,28 +1250,29 @@ class freq_subtrajectory_sampler{
 
                     }
 
-                    if(thorough && min_length >=3){
+                    
 
-                        for (const auto idx: search_ends.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search_ends.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
 
-                            traj_set_ends.insert(idx);
+                        traj_set_ends.insert(idx);
 
-                        }
                     }
+                    
                 }
                 else{
                     
                     // Append the result up to now to c
-                    if(thorough && min_length >=3){
-                        c.push_back(floor(log2(std::accumulate(traj_set_beginnings.begin(),traj_set_beginnings.end(),size_t{0},[&](size_t acc, const auto& kv){return acc + std::count_if(kv.second.begin(),kv.second.end(),[&](const auto& v){return traj_set_ends.contains(v);});})) + 1));
+                    //if(thorough && min_length >=3){
+                    int num_distinct_pathlets = hierarchical_counting(traj_set_beginnings, traj_set_ends);
+                    c.push_back(floor(log2(num_distinct_pathlets) + 1));
 
-                    }
-                    else{
+                    //}
+                    //else{
                         
-                        int num_distinct_pathlets = std::accumulate(traj_set_beginnings.begin(),traj_set_beginnings.end(),size_t{0},[&](size_t acc, const auto& kv){return acc + kv.second.size();});
-                        std::cout << std::format("Trajectory {} is close to {} pathlet beginnings and in this case to {} distinct pathlets.\n", last_seen_trajectory, traj_set_beginnings.size(), num_distinct_pathlets);
-                        c.push_back(floor(log2(num_distinct_pathlets) + 1));
-                    }
+                    //    int num_distinct_pathlets = std::accumulate(traj_set_beginnings.begin(),traj_set_beginnings.end(),size_t{0},[&](size_t acc, const auto& kv){return acc + kv.second.size();});
+                        //std::cout << std::format("Trajectory {} is close to {} pathlet beginnings and in this case to {} distinct pathlets.\n", last_seen_trajectory, traj_set_beginnings.size(), num_distinct_pathlets);
+                    //    c.push_back(floor(log2(num_distinct_pathlets) + 1));
+                    //}
                     
                     //initialize the set again 
                     traj_set_beginnings.clear();
@@ -1279,15 +1285,15 @@ class freq_subtrajectory_sampler{
 
                     }
 
-                    if(thorough && min_length >=3){
+                    
 
-                        for (const auto idx: search_ends.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search_ends.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
 
-                            traj_set_ends.insert(idx);
-
-                        }
+                        traj_set_ends.insert(idx);
 
                     }
+
+                    
                 }
 
             }
@@ -1513,6 +1519,36 @@ class freq_subtrajectory_sampler{
                 res = res * (n - i) / (i + 1);
             }
             return res;
+        }
+        int hierarchical_counting(const std::map<index_t, std::vector<index_t>>& traj_set_beginnings, const std::set<index_t>& traj_set_ends ){
+
+            std::set<std::pair<index_t,index_t>> surviving_pathlets; //inefficient but we'll see
+            //roaring::Roaring pathlets_tids;
+            //for(const auto idx : traj_set_ends){
+
+            //    pathlets_tids.add(the_pathlets.get_id_at(idx));
+
+            //}
+
+            for (const auto& pair: traj_set_beginnings){
+
+                //auto tid = the_pathlets.get_id_at(pair.first);
+                auto beginning = pair.first;
+                for (auto end_idx : pair.second){
+
+                    if(traj_set_ends.contains(end_idx)){
+                        surviving_pathlets.insert({beginning, end_idx});
+                    }
+                    else{
+                        
+                        //Delete the ancestors... this assumes the ancestors have been added before, As it should be since i am iterating through a map in increasing order of key.
+                        std::erase_if(surviving_pathlets, [&](const std::pair<index_t,index_t>& I) {return I.first <= beginning &&I.second >= end_idx;});
+                    }
+
+                }
+
+            }
+            return surviving_pathlets.size();
         }
     std::mt19937 mt;
     std::map<index_t, std::pair<point_t, std::vector<index_t>>> pathlet_beginnings;

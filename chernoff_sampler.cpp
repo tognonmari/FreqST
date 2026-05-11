@@ -126,6 +126,7 @@ int main(int argc, char** argv){
     std::cout<< "GRID SIDE FACTOR: "<<grid_side_wrt_radius<< std::endl;
     std::cout << "MIN LENGTH: "<< minimum_length << std::endl;
     sampler.fill_beginnings_of_pathlet_vector();
+    
     //Hierarchical print:
     int num_pathlets = 0;
     for (const auto& pair : sampler.get_pathlet_beginnings()){
@@ -137,7 +138,7 @@ int main(int argc, char** argv){
     if (thorough){
         sampler.fill_ends_of_pathlet_vector();
     }
-    std::cout << "CHERNOFF (base e): "<< floor(log(num_pathlets)) << std::endl;
+    std::cout << "CHERNOFF (base e): "<< floor(log(num_pathlets))+1 << std::endl;
     switch(mode){
         case sampling_mode::fixed_size:{
             sampler.generate_fixed_size_sample(fixed_size);
