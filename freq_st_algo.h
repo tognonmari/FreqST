@@ -420,7 +420,7 @@ class freq_subtrajectory_sampler{
                 //std::cout << "I am visiting point "<< i <<std::endl;
                 if(i%10000 == 0){
                     
-                std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+                //std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
 
                 }
                 if(the_trajectory.get_id_at(i) == last_seen_trajectory){
