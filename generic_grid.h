@@ -10,7 +10,7 @@ class LowDimensionalGrid{
 
     public: //exposed types
         using point_t = space::point_t;
-        using result_t = std::map<point_identifier_t, std::vector<point_t>>;//std::vector<point_identifier_t>;
+        using result_t = std::map<point_identifier_t, std::pair<std::vector<point_t>, std::vector<point_identifier_t>>>;//std::vector<point_identifier_t>;
         using point_id_t = point_identifier_t;
         template<std::size_t D>
         struct CellKey{ 
@@ -56,7 +56,7 @@ class LowDimensionalGrid{
         using kernel = space::kernel;
         using distance_function_t = space::distance_function_t;
         using distance_t = space::distance_function_t::distance_t;
-        using cell_content_t =std::map<point_identifier_t, std::vector<point_t>>;
+        using cell_content_t =std::map<point_identifier_t, std::pair<std::vector<point_t>, std::vector<point_identifier_t>>>;
         static constexpr std::size_t dimension = space::dimension::value;
         using vector_t = std::conditional_t<(dimension==2), typename kernel::Vector_2, std::conditional_t<(dimension==3), typename kernel::Vector_3, void>>;
 
@@ -70,7 +70,7 @@ class LowDimensionalGrid{
         LowDimensionalGrid(distance_t grid_side, const point_t origin_point, bool point_memorization) : grid_side(grid_side), origin_point(origin_point), point_memorization(point_memorization) {
 
         }
-        //WON'T CHECK FOR ID DuPLICATES if using a vector
+        //To be used in case i don't know additional information ids 
         void insert(point_identifier_t id, const point_t& point){
 
             CellKey<dimension> key = compute_cell_key(point);
@@ -78,8 +78,22 @@ class LowDimensionalGrid{
                 grid[key][id];
             }
             else{
-                grid[key][id].push_back(point);
+                grid[key][id].first.push_back(point);
             }
+
+        }
+        //to be used if i want to keep stuff like second informational id (point_memorization always controls point_t array expansion)
+        void insert(point_identifier_t id, const point_t& point, point_identifier_t second_informational_id){
+
+            CellKey<dimension> key = compute_cell_key(point);
+            if(! point_memorization){
+                grid[key][id].second.push_back(second_informational_id);
+            }
+            else{
+                grid[key][id].first.push_back(point);
+                grid[key][id].second.push_back(second_informational_id);
+            }
+
 
         }
 
@@ -162,13 +176,16 @@ class LowDimensionalGrid{
 
             if(all_included){
                 for (auto& pair : grid[cell]){
-                    output[0][pair.first].insert(output[0][pair.first].end(), pair.second.begin(), pair.second.end());
+                    output[0][pair.first].first.insert(output[0][pair.first].first.end(), pair.second.first.begin(), pair.second.first.end());
+                    output[0][pair.first].second.insert(output[0][pair.first].second.end(), pair.second.second.begin(), pair.second.second.end());
                 }
                 //output[0].insert(output[0].end(),grid[cell].begin(), grid[cell].end());
             }
             else if (partial_intersection){
+                //Dubious range pertainence
                 for (auto& pair : grid[cell]){
-                    output[1][pair.first].insert(output[1][pair.first].end(), pair.second.begin(), pair.second.end());
+                    output[1][pair.first].first.insert(output[1][pair.first].first.end(), pair.second.first.begin(), pair.second.first.end());
+                    output[1][pair.first].second.insert(output[1][pair.first].second.end(), pair.second.second.begin(), pair.second.second.end());
                 }
             }
             return;
