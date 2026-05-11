@@ -206,7 +206,7 @@ class BinaryPathletTree{
                     break;
                 }
             }
-
+            //std::cout << std::format("For pathlet mother {} I have found {} pathlets of min length {}\n", this->getTrajectoryId(), min_length_pathlets.size(), min_length);
             return min_length_pathlets;
         }
 

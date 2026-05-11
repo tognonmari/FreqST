@@ -22,7 +22,7 @@
 namespace frechet{
 
 //Class definition 
-template<CGAL_metric_space_concept m_space>
+template<CGAL_metric_space_concept m_space> 
 class grid_range_search{
 
     public:
@@ -42,12 +42,14 @@ class grid_range_search{
         using search_trait_base = space::search_traits;
         using search_traits = CGAL::Search_traits_adapter<typename property_map_t::key_type, property_map_t, search_trait_base>;
         using grid_range_t = std::vector<index_t>; 
-        using point_id_t = grid_t::point_id_t;
+        using point_id_t = index_t;
         using manual_map_t = std::map<point_id_t, point_t>; // I need this map to be able to erase pts out of range
+        
     public:
         
         using result_t = std::vector<typename property_map_t::key_type>;
-        using intermediate_result_t = std::array<std::map<point_id_t, std::vector<point_t>>, 2>;
+        using extra_informative_result_t = std::map<point_id_t, std::vector<point_id_t>>;
+        using intermediate_result_t = std::array<std::map<point_id_t, std::pair<std::vector<point_t>, std::vector<point_id_t>>>, 2>;
         grid_range_search(const trajectory_t& trajectory, distance_t  grid_side) : point_map(trajectory), 
                                                                             grid(grid_side, trajectory[0]), inserting_trajectories_not_pathlets(false) {
             for (index_t i =0; i< trajectory.total_size(); i++){
@@ -82,6 +84,7 @@ class grid_range_search{
         }
 
         void insert(point_id_t id, point_t point){
+            //If i insert points one by one and i don't want to create a uselessly chunked trajectory
             auto* map_ptr = std::get_if<manual_map_t>(&point_map);
             if (map_ptr == nullptr){
                 return; //Cannot insert using the manula map 
@@ -91,6 +94,66 @@ class grid_range_search{
 
         }
 
+        void insert(point_id_t id, point_t point, point_id_t extra_id_information){
+            //If i insert points one by one and i don't want to create a uselessly chunked trajectory
+            auto* map_ptr = std::get_if<manual_map_t>(&point_map);
+            if (map_ptr == nullptr){
+                return; //Cannot insert using the manula map 
+            }
+            map_ptr ->insert({id, point});
+            grid.insert(id, point, extra_id_information);
+
+        }
+
+        extra_informative_result_t search_and_return_associated_ids(point_t point, distance_t squared_distance){
+            auto search_distance_unsquared = std::sqrt(squared_distance);
+            intermediate_result_t points_in_hypercube;
+            //retrieve cell content
+            points_in_hypercube = grid.search(point,search_distance_unsquared);
+            //delete points out of range
+            if(inserting_trajectories_not_pathlets){
+                erase_trajectories_out_of_range(points_in_hypercube[1], point, squared_distance);
+            }
+            else{
+                
+                erase_points_out_of_range(points_in_hypercube[1], point, squared_distance);
+
+            }
+            std::for_each(points_in_hypercube[1].begin(), points_in_hypercube[1].end(), [&](const auto& kv_pair) {points_in_hypercube[0].try_emplace(kv_pair.first);});
+            //points_in_hypercube[0].insert(points_in_hypercube[0].end(), points_in_hypercube[1].begin(), points_in_hypercube[1].end());
+            extra_informative_result_t result_map;
+            for (const auto& item : points_in_hypercube[0]){
+
+                result_map[item.first] = item.second.second;
+
+            }
+            //auto keys = points_in_hypercube[0] | std::views::keys;
+            //informative_result_t result(keys.begin(), keys.end());
+            return result_map;
+            //return points_in_hypercube[0];
+
+
+        }
+        extra_informative_result_t search_and_return_associated_ids_no_erase(point_t point, distance_t squared_distance){
+            auto search_distance_unsquared = std::sqrt(squared_distance);
+            intermediate_result_t points_in_hypercube;
+            //retrieve cell content
+            points_in_hypercube = grid.search(point,search_distance_unsquared);
+            //delete points out of range
+            std::for_each(points_in_hypercube[1].begin(), points_in_hypercube[1].end(), [&](const auto& kv_pair) {points_in_hypercube[0].try_emplace(kv_pair.first);});
+            //points_in_hypercube[0].insert(points_in_hypercube[0].end(), points_in_hypercube[1].begin(), points_in_hypercube[1].end());
+            extra_informative_result_t result_map;
+            for (const auto& item : points_in_hypercube[0]){
+
+                result_map[item.first] = item.second.second;
+
+            }
+            //auto keys = points_in_hypercube[0] | std::views::keys;
+            //informative_result_t result(keys.begin(), keys.end());
+            return result_map;
+            //return points_in_hypercube[0];
+
+        }
         result_t search(point_t point, distance_t squared_distance){
             
             auto search_distance_unsquared = std::sqrt(squared_distance);
@@ -113,7 +176,6 @@ class grid_range_search{
             return result;
             //return points_in_hypercube[0];
             
-
         }
         result_t search_no_erase(point_t point, distance_t squared_distance){
             
@@ -159,21 +221,21 @@ class grid_range_search{
         }
 
         //Search results clean up
-        void erase_points_out_of_range(std::map<point_id_t, std::vector<point_t>>& map, point_t center, distance_t distance) {
+        void erase_points_out_of_range(std::map<point_id_t, std::pair<std::vector<point_t>, std::vector<point_id_t>>>& map, point_t center, distance_t distance) {
             std::erase_if(map, [this, center, distance](const auto& kv) {
                 return distance_function_t()(get_point(kv.first), center) > distance;
             });
         }
 
-        void erase_trajectories_out_of_range(std::map<point_id_t, std::vector<point_t>>& map, point_t center, distance_t distance) {
+        void erase_trajectories_out_of_range(std::map<point_id_t, std::pair<std::vector<point_t>, std::vector<point_id_t>>>& map, point_t center, distance_t distance) {
             for (auto& pair : map){
-                std::erase_if(pair.second, [this, center, distance, pair](const point_t p) {
+                std::erase_if(pair.second.first, [this, center, distance, pair](const point_t p) {
                     return distance_function_t()(p, center) > distance;
                 });
             }
             
             std::erase_if(map, [](const auto& kv) {
-                return kv.second.empty();   
+                return kv.second.first.empty();   
             });
         }
 
