@@ -663,7 +663,7 @@ class freq_subtrajectory_sampler{
                 bool missing_pairs = true;
                 bool failed_pair_check = false;
                 //PRUNE VIA PAIRS: i need at least k choose 2 pairs that appear in at least 2^{k-2} supports in the restricted ranges list.
-                if(k>=3){
+                if(k>=3 && c_k<50){
                     
                     std::map<std::pair<id_t,id_t>, int> candidate_pairs;
                     int actually_usable_pairs  = 0;
