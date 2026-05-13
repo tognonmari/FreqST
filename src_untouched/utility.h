@@ -303,7 +303,7 @@ class RangeRoaringBitmap{
             for (auto tid: range){
 
                 v.push_back(tid);
-                last_added = tid;
+                //last_added = tid;
             }
 
             return v;
