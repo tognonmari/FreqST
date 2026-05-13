@@ -595,7 +595,7 @@ class freq_subtrajectory_sampler{
                 int c_k = 0;
                 RangeRoaringBitmap<space> tids_for_a_shatterable_set{};
                 for (int idx = 0; idx< inverted_index.size(); idx++){
-                    if(inverted_index[idx].second.count()>= POWERS_OF_TWO[k]-1){
+                    if(inverted_index[idx].second.count()>= POWERS_OF_TWO[k-1]-1){ 
                         c_k = idx;
                         tids_for_a_shatterable_set.add(inverted_index[idx].first);
                     }
@@ -605,7 +605,7 @@ class freq_subtrajectory_sampler{
                 }
                 std::cout << std::format("I am trying to exclude VC-dim = {}:  c_k is {}.\n", k, c_k);
                 std::cout << std::format("The candidate tids for this case are {}, which are {}\n", tids_for_a_shatterable_set.count(), tids_for_a_shatterable_set.to_string());
-                std::cout << std::format("I now build the restricted pathlet map...");
+                std::cout << std::format("I now build the restricted pathlet map...\n");
                 std::map<long unsigned int, RangeRoaringBitmap<space>> restricted_column_map;
             
                 for (const auto& item : columns_map){
@@ -636,8 +636,75 @@ class freq_subtrajectory_sampler{
                 //    std::cout << item.to_string()<< "\n";
                 //}
 
+                //Prune duplicate ranges from restricted ranges list.
+                for (size_t i = 0; i < restricted_ranges_list.size(); ++i) {
+                    int size_of_support = restricted_ranges_list[i].count();
+                    size_t target_position = i+POWERS_OF_TWO[size_of_support]-2; 
+                    if(size_of_support ==1){
+                        target_position = i+1;
+                    }
+                    if(target_position>=restricted_ranges_list.size()){
+                            continue;
+                    }
+                    //If i have more than 2^{size_of_support}-1 copies of the support the exceeding copies are useless. 
+                    //std::cout <<std::format("I have a support of size {} at position {}, so I need to check from position {} onwards.\n", size_of_support, i,target_position);
+                    //std::cout.flush();
+                    while(restricted_ranges_list[target_position]==restricted_ranges_list[i]){
+                        //std::cout << std::format("I am erasing support {}.\n", (*(restricted_ranges_list.begin()+target_position)).to_string());
+                        restricted_ranges_list.erase(restricted_ranges_list.begin() + target_position );
+                    }
+                }
                 
-                
+                //std::cout << "-----------------PRINTING PRUNED SORTED RANGES LIST \n";
+                //for (const auto& item : restricted_ranges_list){
+                //    std::cout << item.to_string()<< "\n";
+                //}
+
+                bool missing_pairs = true;
+                bool failed_pair_check = false;
+                //PRUNE VIA PAIRS: i need at least k choose 2 pairs that appear in at least 2^{k-2} supports in the restricted ranges list.
+                if(k>=3){
+                    
+                    std::map<std::pair<id_t,id_t>, int> candidate_pairs;
+                    int actually_usable_pairs  = 0;
+                    int presence_threshold = POWERS_OF_TWO[k-2];
+                    //std::cout<< std::format("POWERS_OF_TWO[0]={}, POWERS_OF_TWO[{}]={}\n ", POWERS_OF_TWO[0], k-2, POWERS_OF_TWO[k-2]);
+                    int num_usable_pairs_threshold = binom(k, 2);
+                    
+                    for (size_t idx = 0; idx < restricted_ranges_list.size() && missing_pairs; ++idx) {
+                        const auto& s = restricted_ranges_list[idx];
+
+                        std::vector<id_t> tids;
+                        tids.reserve(s.get_range().cardinality());
+                        for (auto tid : s.get_range())
+                            tids.push_back(tid);
+
+                        for (int i = 0; i < (int)tids.size() && missing_pairs; i++) {
+                            for (int j = i + 1; j < (int)tids.size() && missing_pairs; j++) {
+
+                                std::pair<id_t,id_t> pair{tids[i], tids[j]};
+                                candidate_pairs[pair]++;
+                                if(candidate_pairs[pair]==presence_threshold){
+                                    actually_usable_pairs++;
+                                }
+                                if(actually_usable_pairs >=num_usable_pairs_threshold){
+                                    missing_pairs = false;
+                                }
+
+                            }
+                        }
+
+                    }
+                    if (missing_pairs){
+                        std::cout << std::format("I failed the pair check. For actually usable pairs {} and required threshold {}, with presence threshold {}.\n", actually_usable_pairs, num_usable_pairs_threshold, presence_threshold);
+
+                        failed_pair_check = true;
+                    }
+
+                }
+
+
+
 
                 // Now the first items in restricted_ranges_list will be sorted in decreasing order. 
                 // If the cardinalities can carry a set of size k...  
@@ -646,7 +713,7 @@ class freq_subtrajectory_sampler{
                 int needed_pathlets_for_current_visting_size = binom(k, k-current_visiting_size);
                 
                 bool unshatterable = false;
-                for (int i = 0; i< restricted_ranges_list.size(); i++){
+                for (int i = 0; i< restricted_ranges_list.size() ; i++){
                     int c_val = restricted_ranges_list[i].count(); //std::floor(log2(restricted_ranges_list[i].count())-1);
                     if(c_val>= current_visiting_size){
                         //it is good to keep for the shattering
@@ -672,7 +739,7 @@ class freq_subtrajectory_sampler{
 
                 }
                 
-                if(unshatterable || c_k == 0 || current_visiting_size>0 ){
+                if(unshatterable || c_k == 0 || current_visiting_size>0 || failed_pair_check){
                     
                     std::cout<< std::format("With the restricted pathlets I cannot shatter a set with cardinality as large as {}. Hence, I can try the lower value as a better upper bound.\n", k);
                     k--;
