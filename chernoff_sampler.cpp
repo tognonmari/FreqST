@@ -135,9 +135,9 @@ int main(int argc, char** argv){
 
     }
     std::cout << "PATHLETS: "<< num_pathlets << std::endl;
-    if (thorough){
-        sampler.fill_ends_of_pathlet_vector();
-    }
+    
+    sampler.fill_ends_of_pathlet_vector();
+    
     std::cout << "CHERNOFF (base e): "<< floor(log(num_pathlets))+1 << std::endl;
     switch(mode){
         case sampling_mode::fixed_size:{
