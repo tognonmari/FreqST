@@ -20,17 +20,28 @@ class PathletNode{
         bool isNULL;
         bool frequent; //Constructor sets it to true by default
         float frequency= 0.0;
+        int father=-1;
+        int left_child=-1;
+        int right_child=-1;
         subtrajectory_t pathlet;
         roaring::Roaring supporting_trajectories;
     
         PathletNode(int left, int right) : pathlet({left, right}), frequent(true), isNULL(false){}
+        PathletNode(int left, int right, int father_idx, int left_child_idx, int right_child_idx) : pathlet({left, right}), frequent(true), isNULL(false),father(father_idx), right_child(right_child_idx), left_child(left_child_idx){}
+
         inline int getLength(){ return this->pathlet.second - this-> pathlet.first + 1; }
         inline float getFrequency() { return this->frequency; }
         inline subtrajectory_t getPathlet(){ return this->pathlet; }
         inline bool isFrequent() { return this-> frequent; }
         inline void setNULL(){this->isNULL = true;}
         inline void addId(id_t id){this->supporting_trajectories.add(id);}
+        //returns true if this is contained by other
+        inline int getFather(){return this-> father;}
+        inline int getRightChild(){return this->right_child;}
+        inline int getLeftChild(){return this->left_child;}
+        inline bool is_contained_by(const PathletNode& other){return other.pathlet.first<=this->pathlet.first && other.pathlet.second>=this->pathlet.second;}
         inline roaring::Roaring getSupportingTrajectories(){return this->supporting_trajectories;}
+        inline bool isLeaf() {return left_child ==-1 && right_child == -1;}
 };
 
 //represents a collection of pathlets organized as a tree, based on a subtrajectory taken from a trajectory collection
@@ -47,7 +58,9 @@ class BinaryPathletTree{
         using PathletNode = frechet::PathletNode<space>;
 
     public:
-
+        BinaryPathletTree(){
+            
+        }
         
         BinaryPathletTree(trajectory_t& supp, id_t traj_id, int max_depth, int min_length){
             this->support = supp;
@@ -165,7 +178,61 @@ class BinaryPathletTree{
 
             
         }
+        std::vector<PathletNode> getMinLengthPathletsAtLowLevels(int min_length){
+            //Top down visit of the tree which retrieves all pathlets above the length threshold.
+            //Iterate through levels, from left to right, stop when the whole level if split would go under the threshold
+            std::vector<PathletNode> min_length_pathlets;
 
+            //Check the root
+            if( pathlet_collection.at(0).getLength()>=min_length){
+                min_length_pathlets.push_back(pathlet_collection.at(0));
+            }
+            else{
+                return min_length_pathlets;
+            }
+            //Check the children
+            int level_beginning = 1;
+            for (int level =1; level <= this->d; level++){
+
+                level_beginning = (int( pow(2, level))) -1;
+                //Iterate through the level 
+                int max_length_level = -1;
+                for (int k = 0; k<= level_beginning; k++){
+
+                    int position = level_beginning + k;
+                    PathletNode current  = this->pathlet_collection.at(position);
+                    if (current.isNULL){
+                        continue;
+                    }
+                    if(current.getLength()>=min_length){
+                        min_length_pathlets.push_back(current);
+
+                    }
+                    if(current.getLength()>=max_length_level){
+                        max_length_level= current.getLength();
+                    }
+                    
+                }
+
+                if(max_length_level/2.0 < min_length -1){
+                    break;
+                }
+            }
+            //std::cout << std::format("For pathlet mother {} I have found {} pathlets at the lowest level of min length {}\n", this->getTrajectoryId(), min_length_pathlets.size(), min_length);
+            std::reverse(min_length_pathlets.begin(), min_length_pathlets.end());
+            for (size_t i = 0; i<min_length_pathlets.size()-1; i++){
+
+                for (size_t j=i+1; j<min_length_pathlets.size(); j++){
+
+                    if(min_length_pathlets[i].is_contained_by(min_length_pathlets[j])){
+                        min_length_pathlets.erase(min_length_pathlets.begin() + j);
+                    }
+
+                }
+
+            }
+            return min_length_pathlets;
+        }
         std::vector<PathletNode> getMinLengthPathlets(int min_length){
             //Top down visit of the tree which retrieves all pathlets above the length threshold.
             //Iterate through levels, from left to right, stop when the whole level if split would go under the threshold
@@ -231,7 +298,6 @@ class BinaryPathletTree{
         trajectory_t support;
         id_t trajectory_id;
 
-
         static inline int get_father(int node_idx){
 
             assert(node_idx > 0);
@@ -240,8 +306,53 @@ class BinaryPathletTree{
 
             return father;
         }
+        /*
+        void build(){
 
+            pathlet_collection.clear();
+            std::queue<int> nodes_to_process;
+            
+            //Create the root node:
+            pathlet_collection.emplace_back(PathletNode(0, this->n-1) );
+            queue.push(0);
+            while(!q.empty()){
+
+                int current = q.front();
+                PathletNode& node = pathlet_collection[current];
+                //If i don't need to expand the node, I continue
+                if(node.getLength() <= this->l){
+                    continue;
+                }
+
+                int mid = ((node.right - node.left + 1) /  2) - 1 + node.left;
+
+                //Create left child - if it is admitted. 
+                if(mid - node.left >=0){
+                    PathletNode left_child(node.left, mid);
+                    left_child.father = current;
+                    int left_child_vector_idx = pathlet_collection.size();
+                    node.left_child = left_child_vector_idx;
+                    pathlet_collection.push_back(left_child);
+
+                }
+
+                //Create right child
+                if(node.right - (mid+1) >=0){
+                    PathletNode right_child(mid+1, node.right);
+                    right_child.father = current;
+                    int right_child_vector_idx = pathlet_collection.size();
+                    node.rigth_child = right_child_vector_idx;
+                    pathlet_collection.push_back(right_child);
+
+                }
+
+            }
+
+        }
+        
+        */
         //Builds the binary tree of pathlets
+        
         void build(){
 
             //Root is the first node of vector pathlet_collection
@@ -292,10 +403,13 @@ class BinaryPathletTree{
 
             }
 
+            
+
             //ASSERTIONS FOR TOY DS
             //assert(pathlet_collection.at(1).getPathlet().first == 0);
             //std::cout << "This is the second extreme of the 1st node of the second levedl (idx = 1)"<< pathlet_collection.at(1).getPathlet().second<< std::endl;
         }
+        
 
         
 };
