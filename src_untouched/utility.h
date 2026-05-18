@@ -527,19 +527,6 @@ class RangeRoaringBitmap64{
 
         }
 
-        std::vector<id_t> to_vector() const{
-            std::vector<id_t> v;
-
-            for (auto tid: range){
-
-                v.push_back(tid);
-                last_added = tid;
-            }
-
-            return v;
-
-        }
-
         roaring::Roaring64Map get_range() const {
             return this->range;
         }
@@ -568,7 +555,7 @@ class RangeRoaringBitmap64{
         }
 
         void clear(){
-            this->range = roaring::Roaring{};
+            this->range = roaring::Roaring64Map{};
         }
 
         //Risky bit

@@ -1049,7 +1049,7 @@ class freq_subtrajectory_sampler{
                     //if(thorough && min_length >=3){
 
                     for (const auto idx: search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
-                        std::cout << std::format("I am inserting end index {}.\n", idx);
+                        //std::cout << std::format("I am inserting end index {}.\n", idx);
                         traj_set_ends.insert(idx);
 
                     }
@@ -1172,16 +1172,13 @@ class freq_subtrajectory_sampler{
                     traj_set.insert(idx);
 
                 }
-                if(thorough && min_length >= 3){
+                for (const auto idx: search_ends.search(pathlet_point, this->distance_threshold*distance_threshold)) {
 
-                    
-                    for (const auto idx: search_ends.search(pathlet_point, this->distance_threshold*distance_threshold)) {
-
-                        traj_set_ends.insert(idx);
-
-                    }
+                    traj_set_ends.insert(idx);
 
                 }
+
+                
                 /*
                 
                 if( thorough && min_length >=3){
@@ -1192,13 +1189,9 @@ class freq_subtrajectory_sampler{
                     c.push_back(floor(log2(traj_set.size()) + 1));
                 }
                 */
-               if( thorough && min_length >=3){
-                    c.push_back(std::count_if(traj_set.begin(), traj_set.end(), [&](const auto& x){ return traj_set_ends.contains(x); }) + 1);
+               
+                c.push_back(std::count_if(traj_set.begin(), traj_set.end(), [&](const auto& x){ return traj_set_ends.contains(x); }) + 1);
 
-                }
-                else{
-                    c.push_back(traj_set.size());
-                }
                 
             }
             std::sort(c.begin(),c.end(), std::greater<>());
