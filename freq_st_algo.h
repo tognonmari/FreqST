@@ -78,7 +78,8 @@ class freq_subtrajectory_sampler{
             float del, 
             distance_t radius, int minimum_length, int random_seed, double grid_side_factor, bool thorough, bool inspect) : the_trajectory(trajectory), the_pathlets(pathlets), epsilon(eps), delta(del), distance_threshold(radius), 
                                                                                                                 min_length(minimum_length), seed(random_seed), grid_side_factor(grid_side_factor), thorough(thorough) , inspect(inspect){
-
+                the_pathlet_trees.reserve(the_pathlets.get_id_at(the_pathlets.get_actual_size()-1)+1);
+                assert(the_pathlet_trees.capacity()>0);
                 std::mt19937 seeded_generator(seed);
                 this->mt = seeded_generator;
             }
@@ -88,6 +89,7 @@ class freq_subtrajectory_sampler{
             //Given the dataset (this->the_trajectory;) and the min_legth, 
             //we detect the beginning points of the long pathelets and insert them in the beggining vectors.
             //These beginnings will be used to instantiate the grid in the vc dimension
+            std::cout <<std::format("I am about to fill the beginnings vector")<< std::endl;
             id_t last_trajectory = the_pathlets.get_id_at(the_pathlets.get_actual_size()-1);
             id_t current_visiting_id = the_pathlets.get_id_at(0);
             //Step one iterate through whole dataset and build a pathlet tree
@@ -99,9 +101,17 @@ class freq_subtrajectory_sampler{
                 }
                 trajectory_t pathlet_mother = the_pathlets.slice_trajectory_by_id(current_visiting_id);
                 BinaryPathletTree pathlet_tree(pathlet_mother, current_visiting_id, floor(log2(pathlet_mother.total_size())) + 1,1);
-                //For debugging purposes: print the tree
+                
                 //std::cout<< "Pathelet tree for tid "<< current_visiting_id<< std::endl;
                 //std::cout << pathlet_tree.toString()<< std::endl;
+                //std::cout << std::format("pathlet tree vector has capacity {}.\n", the_pathlet_trees.capacity());
+                if(current_visiting_id >= the_pathlet_trees.size()){
+
+                    the_pathlet_trees.resize(current_visiting_id+1);
+
+                }
+                this->the_pathlet_trees[current_visiting_id] = (pathlet_tree);
+                //For debugging purposes: print the tree
                 
                 std::vector<PathletNode<space>> min_length_pathlets = pathlet_tree.getMinLengthPathlets(this-> min_length);
                 //std::cout<< "CALLING HERE for pm "<< current_visiting_id << std::endl;
@@ -995,7 +1005,7 @@ class freq_subtrajectory_sampler{
         }
 
         int vc_dim(){
-
+            std::cout << "Beginning vc dim computation"<<std::endl;
             //Compute VC Dimension 
             range_search_t search{the_pathlets[0], grid_side_factor*distance_threshold};
         
@@ -1005,7 +1015,7 @@ class freq_subtrajectory_sampler{
                 point_t location = pair.second.first;
                 index_t beginning_id = pair.first;
                 for (auto end_id : pair.second.second){
-                    search.insert(beginning_id, location, end_id);
+                    search.insert(beginning_id, location);
                 }
                 
             }
@@ -1026,8 +1036,8 @@ class freq_subtrajectory_sampler{
             
             std::vector<int> c;
             index_t last_seen_trajectory = the_trajectory.get_id_at(0);
-            std::map<index_t, std::vector<index_t>> traj_set_beginnings;
-            std::set<index_t> traj_set_ends;
+            RangeRoaringBitmap64<space> traj_set_beginnings;
+            RangeRoaringBitmap64<space> traj_set_ends;
             float squared_distance_threshold = distance_threshold *distance_threshold;
             for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
                 //if(i%10000 == 0){
@@ -1040,17 +1050,17 @@ class freq_subtrajectory_sampler{
                     point_t point = the_trajectory[i];
                     
 
-                    for (const auto idx: search.search_and_return_associated_ids(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
 
-                        traj_set_beginnings.insert(idx);
+                        traj_set_beginnings.add(idx);
 
                     }
 
                     //if(thorough && min_length >=3){
 
                     for (const auto idx: search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
-                        std::cout << std::format("I am inserting end index {}.\n", idx);
-                        traj_set_ends.insert(idx);
+                        //std::cout << std::format("I am inserting end index {}.\n", idx);
+                        traj_set_ends.add(idx);
 
                     }
                     //}
@@ -1075,9 +1085,9 @@ class freq_subtrajectory_sampler{
                     traj_set_ends.clear();
                     last_seen_trajectory = the_trajectory.get_id_at(i);
                     //add info for the current point
-                    for (const auto idx: search.search_and_return_associated_ids(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
 
-                        traj_set_beginnings.insert(idx);
+                        traj_set_beginnings.add(idx);
 
                     }
 
@@ -1085,7 +1095,7 @@ class freq_subtrajectory_sampler{
 
                     for (const auto idx: search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
 
-                        traj_set_ends.insert(idx);
+                        traj_set_ends.add(idx);
 
                     }
 
@@ -1260,7 +1270,7 @@ class freq_subtrajectory_sampler{
                 point_t location = pair.second.first;
                 index_t beginning_id = pair.first;
                 for (auto end_id : pair.second.second){
-                    search.insert(beginning_id, location, end_id);
+                    search.insert(beginning_id, location);
                 }
                 
             }
@@ -1281,8 +1291,8 @@ class freq_subtrajectory_sampler{
             
             std::vector<int> c;
             index_t last_seen_trajectory = the_trajectory.get_id_at(0);
-            std::map<index_t, std::vector<index_t>> traj_set_beginnings;
-            std::set<index_t> traj_set_ends;
+            RangeRoaringBitmap64<space> traj_set_beginnings;
+            RangeRoaringBitmap64<space> traj_set_ends;
             float squared_distance_threshold = distance_threshold *distance_threshold;
             for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
                 if(i%10000 == 0){
@@ -1295,9 +1305,9 @@ class freq_subtrajectory_sampler{
                     point_t point = the_trajectory[i];
                     
 
-                    for (const auto idx: search.search_and_return_associated_ids_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
 
-                        traj_set_beginnings.insert(idx);
+                        traj_set_beginnings.add(idx);
 
                     }
 
@@ -1305,7 +1315,7 @@ class freq_subtrajectory_sampler{
 
                     for (const auto idx: search_ends.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
 
-                        traj_set_ends.insert(idx);
+                        traj_set_ends.add(idx);
 
                     }
                     
@@ -1330,9 +1340,9 @@ class freq_subtrajectory_sampler{
                     traj_set_ends.clear();
                     last_seen_trajectory = the_trajectory.get_id_at(i);
                     //add info for the current point
-                    for (const auto idx: search.search_and_return_associated_ids_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
 
-                        traj_set_beginnings.insert(idx);
+                        traj_set_beginnings.add(idx);
 
                     }
 
@@ -1340,7 +1350,7 @@ class freq_subtrajectory_sampler{
 
                     for (const auto idx: search_ends.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
 
-                        traj_set_ends.insert(idx);
+                        traj_set_ends.add(idx);
 
                     }
 
@@ -1574,63 +1584,96 @@ class freq_subtrajectory_sampler{
         
         std::set<std::pair<index_t,index_t>> hierarchical_counting_and_reporting(const std::map<index_t, std::vector<index_t>>& traj_set_beginnings, const RangeRoaringBitmap<space>& traj_set_ends ){
 
-            std::set<std::pair<index_t,index_t>> surviving_pathlets; //inefficient but we'll see
+
+            std::set<std::pair<index_t,index_t>> surviving_pathlets; 
+            std::set<std::pair<index_t,index_t>> surviving_pathlets_by_traj; 
             //roaring::Roaring pathlets_tids;
             //for(const auto idx : traj_set_ends){
 
             //    pathlets_tids.add(the_pathlets.get_id_at(idx));
 
             //}
+            RangeRoaringBitmap<space> visited_pathlet_mothers(std::set<id_t>{});
 
             for (const auto& pair: traj_set_beginnings){
                 //std::cout<< std::format("For beginning {} I have {} potential endpoints.\n", pair.first, pair.second.size());
                 //auto tid = the_pathlets.get_id_at(pair.first);
                 auto beginning = pair.first;
-                for (auto end_idx : pair.second){
-
-                    if(traj_set_ends.get_range().contains(end_idx)){
-                        //std::cout <<std::format("For beginning {} and end {}, there is a match, so I insert them.\n", beginning, end_idx);
-                        surviving_pathlets.insert({beginning, end_idx});
+                auto pathlet_mother = the_pathlets.get_id_at(beginning);
+                if(!visited_pathlet_mothers.get_range().contains(pathlet_mother)){
+                    //Get possible pathlets at the lower level 
+                    trajectory_t sliced_trajectory = the_pathlets.slice_trajectory_by_id(pathlet_mother);
+                    BinaryPathletTree pathlet_tree(sliced_trajectory, pathlet_mother, floor(log2(sliced_trajectory.total_size())) + 1,min_length);
+                    //For debugging purposes: print the tree
+                    //std::cout<< "Pathelet tree for tid "<< pathlet_mother<< std::endl;
+                    //std::cout << pathlet_tree.toString()<< std::endl;
+                    
+                    std::vector<PathletNode<space>> min_length_pathlets_low_level = pathlet_tree.getMinLengthPathletsAtLowLevels(this-> min_length);
+                    std::vector<PathletNode<space>> min_length_pathlets= pathlet_tree.getMinLengthPathlets(this-> min_length);
+                    //std::cout<< "CALLING HERE for pm "<< current_visiting_id << std::endl;
+                    index_t trajectory_offset = the_pathlets.get_first_point_in_trajectory(pathlet_mother);
+                    //NOw for each low level node I look if it is present, otherwise I delete it from the min_length_pathlets. 
+                    for (size_t i = 0; i< min_length_pathlets_low_level.size(); i++){
+                        auto pathlet_beginning = min_length_pathlets_low_level[i].pathlet.first;
+                        auto pathlet_end = min_length_pathlets_low_level[i].pathlet.second;
+                        if(!(traj_set_beginnings.contains(pathlet_beginning + trajectory_offset) && traj_set_ends.get_range().contains(pathlet_end + trajectory_offset))){
+                            std::erase_if(min_length_pathlets, [&](const PathletNode<space>& pn){return min_length_pathlets_low_level[i].is_contained_by(pn);});
+                        }
                     }
-                    else{
-                        //std::cout<< std::format("For beginning {} and end {} there is no match so I remove all the hierarchically larger pathlets.\n", beginning, end_idx);
-                        //Delete the ancestors... this assumes the ancestors have been added before, As it should be since i am iterating through a map in increasing order of key.
-                        std::erase_if(surviving_pathlets, [&](const std::pair<index_t,index_t>& I) {return I.first <= beginning &&I.second >= end_idx;});
+                    for (const auto alive_pn : min_length_pathlets){
+                        surviving_pathlets.insert({trajectory_offset + alive_pn.pathlet.first, trajectory_offset + alive_pn.pathlet.second});
                     }
-
+                    visited_pathlet_mothers.add(pathlet_mother);
                 }
+
 
             }
             return surviving_pathlets;
         }
 
-        int hierarchical_counting(const std::map<index_t, std::vector<index_t>>& traj_set_beginnings, const std::set<index_t>& traj_set_ends ){
+        int hierarchical_counting(const RangeRoaringBitmap64<space>& traj_set_beginnings, const RangeRoaringBitmap64<space>& traj_set_ends ){
 
-            std::set<std::pair<index_t,index_t>> surviving_pathlets; //inefficient but we'll see
+            std::set<std::pair<index_t,index_t>> surviving_pathlets; 
+             
             //roaring::Roaring pathlets_tids;
             //for(const auto idx : traj_set_ends){
 
             //    pathlets_tids.add(the_pathlets.get_id_at(idx));
 
             //}
+            RangeRoaringBitmap<space> visited_pathlet_mothers(std::set<id_t>{});
 
-            for (const auto& pair: traj_set_beginnings){
+            for (const auto& beginning: traj_set_beginnings.get_range()){
                 //std::cout<< std::format("For beginning {} I have {} potential endpoints.\n", pair.first, pair.second.size());
                 //auto tid = the_pathlets.get_id_at(pair.first);
-                auto beginning = pair.first;
-                for (auto end_idx : pair.second){
-
-                    if(traj_set_ends.contains(end_idx)){
-                        //std::cout <<std::format("For beginning {} and end {}, there is a match, so I insert them.\n", beginning, end_idx);
-                        surviving_pathlets.insert({beginning, end_idx});
+                
+                auto pathlet_mother = the_pathlets.get_id_at(beginning);
+                if(!visited_pathlet_mothers.get_range().contains(pathlet_mother)){
+                    //Get possible pathlets at the lower level 
+                    //trajectory_t sliced_trajectory = the_pathlets.slice_trajectory_by_id(pathlet_mother);
+                    //BinaryPathletTree pathlet_tree = the_pathlet_trees[pathlet_mother];
+                    //For debugging purposes: print the tree
+                    //std::cout<< "Pathelet tree for tid "<< pathlet_mother<< std::endl;
+                    //std::cout << pathlet_tree.toString()<< std::endl;
+                    
+                    std::vector<PathletNode<space>> min_length_pathlets_low_level =  the_pathlet_trees[pathlet_mother].getMinLengthPathletsAtLowLevels(this-> min_length);
+                    std::vector<PathletNode<space>> min_length_pathlets=  the_pathlet_trees[pathlet_mother].getMinLengthPathlets(this-> min_length);
+                    //std::cout<< "CALLING HERE for pm "<< current_visiting_id << std::endl;
+                    index_t trajectory_offset = the_pathlets.get_first_point_in_trajectory(pathlet_mother);
+                    //NOw for each low level node I look if it is present, otherwise I delete it from the min_length_pathlets. 
+                    for (size_t i = 0; i< min_length_pathlets_low_level.size(); i++){
+                        auto pathlet_beginning = min_length_pathlets_low_level[i].pathlet.first;
+                        auto pathlet_end = min_length_pathlets_low_level[i].pathlet.second;
+                        if(!(traj_set_beginnings.get_range().contains(pathlet_beginning + trajectory_offset) && traj_set_ends.get_range().contains(pathlet_end + trajectory_offset))){
+                            std::erase_if(min_length_pathlets, [&](const PathletNode<space>& pn){return min_length_pathlets_low_level[i].is_contained_by(pn);});
+                        }
                     }
-                    else{
-                        //std::cout<< std::format("For beginning {} and end {} there is no match so I remove all the hierarchically larger pathlets.\n", beginning, end_idx);
-                        //Delete the ancestors... this assumes the ancestors have been added before, As it should be since i am iterating through a map in increasing order of key.
-                        std::erase_if(surviving_pathlets, [&](const std::pair<index_t,index_t>& I) {return I.first <= beginning &&I.second >= end_idx;});
+                    for (const auto alive_pn : min_length_pathlets){
+                        surviving_pathlets.insert({trajectory_offset + alive_pn.pathlet.first, trajectory_offset + alive_pn.pathlet.second});
                     }
-
+                    visited_pathlet_mothers.add(pathlet_mother);
                 }
+
 
             }
             return surviving_pathlets.size();
@@ -1650,6 +1693,7 @@ class freq_subtrajectory_sampler{
     std::vector<id_t> sampled_trajs_ids;
     trajectory_t the_trajectory;
     trajectory_t the_pathlets;
+    std::vector<BinaryPathletTree<space>> the_pathlet_trees; 
     distance_t distance_threshold;
     bool thorough;
     float epsilon;

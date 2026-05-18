@@ -568,7 +568,7 @@ class RangeRoaringBitmap64{
         }
 
         void clear(){
-            this->range = roaring::Roaring{};
+            this->range = roaring::Roaring64Map{};
         }
 
         //Risky bit
