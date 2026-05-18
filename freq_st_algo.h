@@ -100,7 +100,7 @@ class freq_subtrajectory_sampler{
                     last_iter = true;
                 }
                 trajectory_t pathlet_mother = the_pathlets.slice_trajectory_by_id(current_visiting_id);
-                BinaryPathletTree pathlet_tree(pathlet_mother, current_visiting_id, floor(log2(pathlet_mother.total_size())) + 1,1);
+                LightWeightBinaryPathletTree pathlet_tree(pathlet_mother, current_visiting_id, floor(log2(pathlet_mother.total_size())) + 1,1);
                 
                 //std::cout<< "Pathelet tree for tid "<< current_visiting_id<< std::endl;
                 //std::cout << pathlet_tree.toString()<< std::endl;
@@ -136,7 +136,7 @@ class freq_subtrajectory_sampler{
             //Stop when along the level all pathelts are shorter. 
              
             //For debugging purposes: print the pathlet beginnings 
-            //std::cout << "The pathlet beginnings are : "<< std::endl;
+            std::cout << "The pathlet beginnings are : "<< std::endl;
             //for (const auto& pt : this->pathlet_beginnings){
             //    std::cout<< pt.first <<"\n";
             //}
@@ -1693,7 +1693,7 @@ class freq_subtrajectory_sampler{
     std::vector<id_t> sampled_trajs_ids;
     trajectory_t the_trajectory;
     trajectory_t the_pathlets;
-    std::vector<BinaryPathletTree<space>> the_pathlet_trees; 
+    std::vector<LightWeightBinaryPathletTree<space>> the_pathlet_trees; 
     distance_t distance_threshold;
     bool thorough;
     float epsilon;
