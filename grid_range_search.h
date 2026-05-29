@@ -105,11 +105,11 @@ class grid_range_search{
 
         }
 
-        extra_informative_result_t search_and_return_associated_ids(point_t point, distance_t squared_distance){
+        extra_informative_result_t search_and_return_associated_ids(point_t point, distance_t squared_distance, id_t tid){
             auto search_distance_unsquared = std::sqrt(squared_distance);
             intermediate_result_t points_in_hypercube;
             //retrieve cell content
-            points_in_hypercube = grid.search(point,search_distance_unsquared);
+            points_in_hypercube = grid.search(point,search_distance_unsquared, tid);
             //delete points out of range
             if(inserting_trajectories_not_pathlets){
                 erase_trajectories_out_of_range(points_in_hypercube[1], point, squared_distance);
@@ -134,11 +134,11 @@ class grid_range_search{
 
 
         }
-        extra_informative_result_t search_and_return_associated_ids_no_erase(point_t point, distance_t squared_distance){
+        extra_informative_result_t search_and_return_associated_ids_no_erase(point_t point, distance_t squared_distance, id_t tid){
             auto search_distance_unsquared = std::sqrt(squared_distance);
             intermediate_result_t points_in_hypercube;
             //retrieve cell content
-            points_in_hypercube = grid.search(point,search_distance_unsquared);
+            points_in_hypercube = grid.search(point,search_distance_unsquared, tid);
             //delete points out of range
             std::for_each(points_in_hypercube[1].begin(), points_in_hypercube[1].end(), [&](const auto& kv_pair) {points_in_hypercube[0].try_emplace(kv_pair.first);});
             //points_in_hypercube[0].insert(points_in_hypercube[0].end(), points_in_hypercube[1].begin(), points_in_hypercube[1].end());
@@ -154,12 +154,12 @@ class grid_range_search{
             //return points_in_hypercube[0];
 
         }
-        result_t search(point_t point, distance_t squared_distance){
+        result_t search(point_t point, distance_t squared_distance, id_t tid){
             
             auto search_distance_unsquared = std::sqrt(squared_distance);
             intermediate_result_t points_in_hypercube;
             //retrieve cell content
-            points_in_hypercube = grid.search(point,search_distance_unsquared);
+            points_in_hypercube = grid.search(point,search_distance_unsquared, tid);
             //delete points out of range
             if(inserting_trajectories_not_pathlets){
                 erase_trajectories_out_of_range(points_in_hypercube[1], point, squared_distance);
@@ -177,12 +177,12 @@ class grid_range_search{
             //return points_in_hypercube[0];
             
         }
-        result_t search_no_erase(point_t point, distance_t squared_distance){
+        result_t search_no_erase(point_t point, distance_t squared_distance, id_t tid){
             
             auto search_distance_unsquared = std::sqrt(squared_distance);
             intermediate_result_t points_in_hypercube;
             //retrieve cell content
-            points_in_hypercube = grid.search(point,search_distance_unsquared);
+            points_in_hypercube = grid.search(point,search_distance_unsquared, tid);
             //DO NOT delete points out of range
             //erase_points_out_of_range(points_in_hypercube[1], index, squared_distance);
             //points_in_hypercube[0].insert(points_in_hypercube[0].end(), points_in_hypercube[1].begin(), points_in_hypercube[1].end());
@@ -193,6 +193,16 @@ class grid_range_search{
             return result;
         }
         
+        int count_nearby_points_weighted_no_erase(point_t point, distance_t squared_distance, id_t tid){
+
+            auto search_distance_unsquared = std::sqrt(squared_distance);
+            int intersecting_cells_points = grid.count(point, search_distance_unsquared, tid);
+
+            return intersecting_cells_points;
+
+
+        }
+
         grid_t& get_grid() {
 
             return this-> grid;

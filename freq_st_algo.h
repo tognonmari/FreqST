@@ -12,6 +12,7 @@
 #include "roaring.hh"
 
 #include "free_space_graph_free_axis.h"
+#include "free_space_graph_free_axis_flexible.h"
 #include "kdtree_range_search.h"
 #include "metric_space.h"
 #include "io.h"
@@ -27,7 +28,6 @@ struct freq_subtrajectory_algo_output_config{
     bool maximal = false;
     bool keep_matching_ids = false;
     int min_length = 1;
-    std::string path_to_temporary_pathlet_dump = "./vc_dim_dump_files"; //One row per pathlet with the matches-> this is to use less memorhy for the exact computation
 
 };
 template<metric_space m_space>
@@ -282,6 +282,27 @@ class freq_subtrajectory_sampler{
             this->sample_trajectories(sample_size);
 
         }
+        
+        void generate_turbo_rough_vc_no_erase_sample(){
+
+            //Step 1: compute sample size according to rule. 
+            (this->sampled_trajs_ids).clear();
+
+            int sample_size = (int) (2 / (epsilon * epsilon)) * (this->turbo_rough_vc_dim_no_erase() + log(2 / delta));
+            std::cout << "Turbo Rough VCdim sample size with espilon "<<epsilon << ",  delta "<< delta <<", radius "<< distance_threshold<< " is: "<< sample_size <<std::endl;
+            //Step 2: assert sampling is worthwhile
+            if(sample_size > the_trajectory.num_trajectories()){
+
+                std::cerr << "VC Bound was too loose for your dataset."<< std::endl;
+
+                std::exit(1);
+
+            }
+            //Step 3: Sample indexes with replacement
+            this->sample_trajectories(sample_size);
+
+        }
+        
         void generate_pathlets_vc_dim_sample(){
             //Step 1: compute sample size according to rule. 
             (this->sampled_trajs_ids).clear();
@@ -469,7 +490,7 @@ class freq_subtrajectory_sampler{
                     point_t point = the_trajectory[i];
                     
 
-                    for (const auto idx: search.search_and_return_associated_ids(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search.search_and_return_associated_ids(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i))) {
 
                         traj_set_beginnings.insert(idx);
 
@@ -477,7 +498,7 @@ class freq_subtrajectory_sampler{
 
                     //if(thorough && min_length >=3){
 
-                    for (const auto idx: search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i))) {
                         //std::cout << std::format("I am inserting end index {}.\n", idx);
                         traj_set_ends.add(idx);
 
@@ -518,7 +539,7 @@ class freq_subtrajectory_sampler{
                     traj_set_ends.clear();
                     last_seen_trajectory = the_trajectory.get_id_at(i);
                     //add info for the current point
-                    for (const auto idx: search.search_and_return_associated_ids(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search.search_and_return_associated_ids(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i))) {
 
                         traj_set_beginnings.insert(idx);
 
@@ -526,7 +547,7 @@ class freq_subtrajectory_sampler{
 
                     
 
-                    for (const auto idx: search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold,the_trajectory.get_id_at(i))) {
 
                         traj_set_ends.add(idx);
 
@@ -770,6 +791,7 @@ class freq_subtrajectory_sampler{
             return k;
 
         }
+        
         int rough_vc_dim_no_erase(){
 
             range_search_t search{the_pathlets[0], grid_side_factor*distance_threshold};
@@ -813,11 +835,11 @@ class freq_subtrajectory_sampler{
                 if(the_trajectory.get_id_at(i) == last_seen_trajectory){
                     
                     
-                    std::map<index_t, std::vector<index_t>> retrieved_points = search.search_and_return_associated_ids_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold);
+                    std::map<index_t, std::vector<index_t>> retrieved_points = search.search_and_return_associated_ids_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold,the_trajectory.get_id_at(i));
                     counter +=std::accumulate(retrieved_points.begin(),retrieved_points.end(),size_t{0},[&](size_t acc, const auto& kv){return acc + kv.second.size();});
                     retrieved_points_with_duplicates.insert(retrieved_points_with_duplicates.end(), retrieved_points.begin(), retrieved_points.end());
                     if(thorough && min_length >=3){
-                        std::map<index_t, std::vector<index_t>> retrieved_ends = search.search_and_return_associated_ids_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold);
+                        std::map<index_t, std::vector<index_t>> retrieved_ends = search.search_and_return_associated_ids_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i));
                         counter_ends +=std::accumulate(retrieved_ends.begin(),retrieved_ends.end(),size_t{0},[&](size_t acc, const auto& kv){return acc + kv.second.size();});
                     }
 
@@ -852,11 +874,11 @@ class freq_subtrajectory_sampler{
                     counter_ends = 0;
                     retrieved_points_with_duplicates.clear();
                     last_seen_trajectory = the_trajectory.get_id_at(i);
-                    std::map<index_t, std::vector<index_t>> retrieved_points = search.search_and_return_associated_ids_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold);
+                    std::map<index_t, std::vector<index_t>> retrieved_points = search.search_and_return_associated_ids_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i));
                     counter +=std::accumulate(retrieved_points.begin(),retrieved_points.end(),size_t{0},[&](size_t acc, const auto& kv){return acc + kv.second.size();});
                     retrieved_points_with_duplicates.insert(retrieved_points_with_duplicates.end(), retrieved_points.begin(), retrieved_points.end());
                     if(thorough && min_length >=3){
-                        std::map<index_t, std::vector<index_t>> retrieved_ends = search.search_and_return_associated_ids_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold);
+                        std::map<index_t, std::vector<index_t>> retrieved_ends = search.search_and_return_associated_ids_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i));
                         counter_ends +=std::accumulate(retrieved_ends.begin(),retrieved_ends.end(),size_t{0},[&](size_t acc, const auto& kv){return acc + kv.second.size();});
                     }
                     //add info for the current point
@@ -899,7 +921,128 @@ class freq_subtrajectory_sampler{
             return vc_dim;
 
         }
+        
+        int turbo_rough_vc_dim_no_erase(){            
+            range_search_t search{the_pathlets[0], grid_side_factor*distance_threshold};
 
+            for (const auto& pair : this->pathlet_beginnings){
+
+                point_t location = pair.second.first;
+                index_t beginning_id = pair.first;
+                for (auto end_id : pair.second.second){
+                    search.insert(beginning_id, location, end_id);
+                }
+                
+            }
+            
+            range_search_t search_ends{the_pathlets[0], grid_side_factor*distance_threshold};
+
+            if(thorough && min_length >=3){
+                for (const auto& pair : this->pathlet_ends){
+                    point_t location = pair.second.first;
+                    index_t beginning_id = pair.first;
+                    for (auto end_id : pair.second.second){
+                        search.insert(beginning_id, location, end_id);
+                    }
+                }
+                //assert(search_ends.num_elements() == search.num_elements());
+            }
+            int d = 0;
+            std::set<transaction_and_points_pair> c;
+            index_t last_seen_trajectory = the_trajectory.get_id_at(0);
+            int counter=0;
+            int counter_ends =0; 
+            std::vector<std::pair<long unsigned int, std::vector<long unsigned int> >> retrieved_points_with_duplicates;
+            int total_distances = 0;
+            float squared_distance_threshold = distance_threshold*distance_threshold;
+            for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
+                //if(i%10000 == 0){
+                    
+                //std::cout<< "Processing point "<< i<< " to find the c bound" << std::endl;
+
+                //}
+                if(the_trajectory.get_id_at(i) == last_seen_trajectory){
+                    
+                    
+                    int retrieved_points = search.count_nearby_points_weighted_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold,the_trajectory.get_id_at(i));
+                    counter += retrieved_points;
+                    if(thorough && min_length >=3){
+                        int retrieved_ends = search_ends.count_nearby_points_weighted_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i));
+                        counter_ends += retrieved_ends;
+                    }
+
+                }
+                else{
+
+                    int min_c = counter;
+                    if(thorough && min_length >= 3){
+                        
+                        min_c = std::min(counter, counter_ends);
+                    }
+                    // Append the result up to now to c
+                    if(floor(log2(min_c*(1.0-(1/min_c))) + 1) > d) {
+
+                        c.insert(transaction_and_points_pair{last_seen_trajectory, retrieved_points_with_duplicates ,floor(log2(min_c*(1.0-(1/min_c))) + 1)});
+                        int l_prime = prev(c.end())->capacity_ub;
+                        if(l_prime >d){
+                            d++;
+                        }
+                        else{
+
+                            c.erase(prev(c.end()));
+
+                        }
+                    }
+                    //c.push_back(floor(log2(min_c*(1.0-(1/min_c))) + 1));
+                    
+                    //initialize the set again 
+                    counter = 0;
+                    counter_ends = 0;
+                    retrieved_points_with_duplicates.clear();
+                    last_seen_trajectory = the_trajectory.get_id_at(i);
+                    int retrieved_points = search.count_nearby_points_weighted_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i));
+                    counter += retrieved_points;
+                    
+                    if(thorough && min_length >=3){
+                        int retrieved_ends = search.count_nearby_points_weighted_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i));
+                        counter_ends +=retrieved_ends;
+                    }
+                    //add info for the current point
+
+
+                }
+
+            }  
+            //std::cout<<total_distances << std::endl;
+            //std::sort(c.begin(),c.end(), std::greater<>());
+            //std::cout <<"############ Details: #################\n";
+            /*
+            for (int i=0; i<c.size();i++){
+
+                std::cout<< " H index vector at position "<< i<< " "<< c.at(i)<<std::endl;
+
+            }
+            */
+            
+            int vc_dim = prev(c.end())->capacity_ub;
+            /*
+             for(int i = 0 ; i < c.size(); i++){
+
+                if(vc_dim < c.at(i)){
+
+                    vc_dim++;
+
+                }
+
+            }
+            
+            */
+           
+            std::cout <<"VC DIM ESTIMATE IS "<< vc_dim <<"\n";
+            
+            return vc_dim;
+        }
+        
         int rough_vc_dim(){
             range_search_t search{the_pathlets[0], grid_side_factor*distance_threshold};
 
@@ -943,10 +1086,10 @@ class freq_subtrajectory_sampler{
                 if(the_trajectory.get_id_at(i) == last_seen_trajectory){
                     
                     
-                    int ss = search.search(the_trajectory[i], this->distance_threshold*distance_threshold).size();
+                    int ss = search.search(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i)).size();
                     counter +=ss;
                     if(thorough && min_length >=3){
-                        int ss_ends = search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold).size();
+                        int ss_ends = search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i)).size();
                         counter_ends += ss_ends;
                     }
 
@@ -965,10 +1108,10 @@ class freq_subtrajectory_sampler{
                     counter = 0;
                     counter_ends= 0;
                     last_seen_trajectory = the_trajectory.get_id_at(i);
-                    int ss = search.search(the_trajectory[i], this->distance_threshold*distance_threshold).size();
+                    int ss = search.search(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i)).size();
                     counter += ss;
                     if(thorough && min_length >=3){
-                        int ss_ends = search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold).size();
+                        int ss_ends = search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i)).size();
                         counter_ends += ss_ends;
                     }
                     //add info for the current point
@@ -1038,6 +1181,8 @@ class freq_subtrajectory_sampler{
             index_t last_seen_trajectory = the_trajectory.get_id_at(0);
             RangeRoaringBitmap64<space> traj_set_beginnings;
             RangeRoaringBitmap64<space> traj_set_ends;
+            //std::vector<index_t> traj_set_beginnings;
+            //std::vector<index_t> traj_set_ends;
             float squared_distance_threshold = distance_threshold *distance_threshold;
             for(index_t i =0; i<=the_trajectory.get_actual_size(); i++){
                 //if(i%10000 == 0){
@@ -1050,17 +1195,20 @@ class freq_subtrajectory_sampler{
                     point_t point = the_trajectory[i];
                     
 
-                    for (const auto idx: search.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search.search(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i))) {
 
                         traj_set_beginnings.add(idx);
 
                     }
 
                     //if(thorough && min_length >=3){
-
-                    for (const auto idx: search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    if(min_length >1){
+                        
+                        for (const auto idx: search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i))) {
                         //std::cout << std::format("I am inserting end index {}.\n", idx);
-                        traj_set_ends.add(idx);
+                            traj_set_ends.add(idx);
+
+                        }
 
                     }
                     //}
@@ -1069,7 +1217,14 @@ class freq_subtrajectory_sampler{
                     
                     // Append the result up to now to c
                     //if(thorough && min_length >=3){
-                    int num_distinct_pathlets = hierarchical_counting(traj_set_beginnings, traj_set_ends);
+                    int num_distinct_pathlets = 0;
+                    if(min_length >1){
+
+                        num_distinct_pathlets = hierarchical_counting(traj_set_beginnings, traj_set_ends);
+                    }
+                    else{
+                        num_distinct_pathlets = hierarchical_counting(traj_set_beginnings, traj_set_beginnings);
+                    }
                     c.push_back(floor(log2(num_distinct_pathlets) + 1));
 
                     //}
@@ -1085,19 +1240,23 @@ class freq_subtrajectory_sampler{
                     traj_set_ends.clear();
                     last_seen_trajectory = the_trajectory.get_id_at(i);
                     //add info for the current point
-                    for (const auto idx: search.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search.search(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i))) {
 
                         traj_set_beginnings.add(idx);
 
                     }
 
                     
+                    if(min_length> 1){
 
-                    for (const auto idx: search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                        for (const auto idx: search_ends.search(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i))) {
 
-                        traj_set_ends.add(idx);
+                            traj_set_ends.add(idx);
+
+                        }
 
                     }
+                    
 
                     
                 }
@@ -1177,7 +1336,7 @@ class freq_subtrajectory_sampler{
                 traj_set_ends.clear();
                 auto pathlet_idx = pair.first;
                 auto pathlet_point = pair.second.first;
-                for (const auto idx: search.search(pathlet_point, this->distance_threshold*distance_threshold)) {
+                for (const auto idx: search.search(pathlet_point, this->distance_threshold*distance_threshold, pathlet_idx)) {
 
                     traj_set.insert(idx);
 
@@ -1185,7 +1344,7 @@ class freq_subtrajectory_sampler{
                 if(thorough && min_length >= 3){
 
                     
-                    for (const auto idx: search_ends.search(pathlet_point, this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search_ends.search(pathlet_point, this->distance_threshold*distance_threshold, pathlet_idx)) {
 
                         traj_set_ends.insert(idx);
 
@@ -1255,9 +1414,6 @@ class freq_subtrajectory_sampler{
                 vc_dim++;
             }
         }
-        int pathlets_vc_dim_no_erase(){
-            //TODO
-        }
         
         int vc_dim_no_erase(){
 
@@ -1305,7 +1461,7 @@ class freq_subtrajectory_sampler{
                     point_t point = the_trajectory[i];
                     
 
-                    for (const auto idx: search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i))) {
 
                         traj_set_beginnings.add(idx);
 
@@ -1313,7 +1469,7 @@ class freq_subtrajectory_sampler{
 
                     
 
-                    for (const auto idx: search_ends.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search_ends.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i))) {
 
                         traj_set_ends.add(idx);
 
@@ -1340,7 +1496,7 @@ class freq_subtrajectory_sampler{
                     traj_set_ends.clear();
                     last_seen_trajectory = the_trajectory.get_id_at(i);
                     //add info for the current point
-                    for (const auto idx: search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i))) {
 
                         traj_set_beginnings.add(idx);
 
@@ -1348,7 +1504,7 @@ class freq_subtrajectory_sampler{
 
                     
 
-                    for (const auto idx: search_ends.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold)) {
+                    for (const auto idx: search_ends.search_no_erase(the_trajectory[i], this->distance_threshold*distance_threshold, the_trajectory.get_id_at(i))) {
 
                         traj_set_ends.add(idx);
 
@@ -1714,6 +1870,7 @@ class frequent_subtrajectory_algo{
         using subtrajectory_t = trajectory_t::subtrajectory_t;
         using index_t = trajectory_t::index_t;
         using free_space_graph_t = free_space_graph_free_axis<space>;
+        using free_space_graph_flexible_t = free_space_graph_free_axis_flexible<space>;
         using point_t = space::point_t;
         using distance_function_t = space::distance_function_t;
         using distance_t = distance_function_t::distance_t;
@@ -1774,6 +1931,72 @@ class frequent_subtrajectory_algo{
             }
         }
         //Computes all frequent pathlets and saves in in this->freq_pathlets
+        /*
+        
+        void compute_frequent_pathlets_with_trajectory_slicing_and_limited_fsg_construtction(){
+            std::ifstream input_stream(this->dataset_location); //input stream that reads trajectories upon which we build the pathlets
+
+            int sample_size = this->sample.num_trajectories_not_consecutive();
+            int chunk_size = 50;//int(this-> sample.num_trajectories_not_consecutive()/50);
+            
+            
+            while(!input_stream.eof()){
+                //One pathlet tree at a time
+                trajectory_t pathlet_mother = this->read_next_transaction_from_file(input_stream);
+
+                BinaryPathletTree pathlet_tree(pathlet_mother, pathlet_mother.get_id_at(0),floor(log2(pathlet_mother.total_size())) + 1,output_config.min_length);
+                //std::cout <<"The transaction has id "<< pathlet_mother.get_id_at(0) <<std::endl;
+                bool no_frequent_for_this_tree = false;
+                int num_visited_trajectories = 0;
+                id_t next_first_id_of_chunk= this->sample.get_id_at(0);
+                subtrajectory_t chunk;
+                chunk.second = 0;
+                //std::cout << "Testing frequency for id "<< pathlet_mother.get_id_at(0)<< std::endl;
+
+                //Test the pathlet against the trajectories in a "chunk" and then update the chunk
+                while (chunk.second < sample.total_size()-1){
+                    num_visited_trajectories +=chunk_size;
+                    chunk = extract_chunked_slice(next_first_id_of_chunk, chunk_size);
+                    
+                    
+                    //slice.first = sample.get_first_point_in_trajectory(next_id);
+                    //slice.second =  sample.get_first_point_in_trajectory(next_id) + sample.get_trajectory_size(next_id);
+                    
+                    free_space_graph_flexible_t fsg(0);
+
+                    //POPULATE FSG
+                    //std::cout << fsg.to_string(sample,chunk) <<std::endl; 
+                    this->pruned_fsg_population(fsg, chunk, pathlet_mother, pathlet_tree); //Should receive pathlet tree
+                    std::cout << fsg.to_string(sample,chunk) <<std::endl; 
+                    this->query_and_update_counts_for_all_pathlets<free_space_graph_flexible_t>(fsg, chunk, pathlet_tree);
+                                      
+                    
+                    //ASSERT AT LEAST ONE FREQUENT EXISTS in the pathlet tree
+                    if(!some_potentially_frequent_exists(pathlet_tree, num_visited_trajectories, sample_size)){
+                        no_frequent_for_this_tree = true;
+                        break;
+                    }
+                    
+                    
+                    if(chunk.second < sample.total_size()-1){
+
+                        id_t second_id = sample.get_id_at(chunk.second);
+
+                        next_first_id_of_chunk = sample.get_id_at(sample.get_first_point_in_trajectory(second_id) + sample.get_trajectory_size(second_id));
+
+                    }
+                }
+
+                //COLLECT THE FREQUENT ONES 
+                if (!no_frequent_for_this_tree){
+                //std::cout<< "I have found some frequent"<<std::endl;
+                this->collect_frequent_pathlets_from_single_tree(pathlet_tree);
+                }
+            }
+
+        }
+        */
+
         void compute_frequent_pathlets_with_trajectory_slicing(){
         
             std::ifstream input_stream(this->dataset_location); //input stream that reads trajectories upon which we build the pathlets
@@ -1810,7 +2033,7 @@ class frequent_subtrajectory_algo{
                     //std::cout << fsg.to_string(sample,chunk) <<std::endl; 
                     this->populate_all_columns_with_labels_for_single_slice(fsg, chunk, pathlet_mother, pathlet_tree); //Should receive pathlet tree
                     //std::cout << fsg.to_string(sample,chunk) <<std::endl; 
-                    this->query_and_update_counts_for_all_pathlets(fsg, chunk, pathlet_tree);
+                    this->query_and_update_counts_for_all_pathlets<free_space_graph_t>(fsg, chunk, pathlet_tree);
                                       
                     
                     //ASSERT AT LEAST ONE FREQUENT EXISTS in the pathlet tree
@@ -1997,7 +2220,8 @@ class frequent_subtrajectory_algo{
             }
         }
         //Queries the pathlets in pathlet_tree against the free space graph fsg, updating their counts when a match is found
-        void query_and_update_counts_for_all_pathlets(free_space_graph_t& fsg, subtrajectory_t& slice, binary_pathlet_tree_t& pathlet_tree){
+        template <typename fsg_type>
+        void query_and_update_counts_for_all_pathlets(fsg_type& fsg, subtrajectory_t& slice, binary_pathlet_tree_t& pathlet_tree){
             
             int d = pathlet_tree.getDepth(); 
 
@@ -2134,6 +2358,63 @@ class frequent_subtrajectory_algo{
             //std::cout<< "i create columns without sf"<< std::endl;
             //assert(iterations == sample.get_actual_size());
         }
+        /*
+        
+        roaring::Roaring populate_column_with_labels_for_single_slice(free_space_graph_flexible_t &fsg, const point_t& point, const distance_t& query_distance, index_t column_index, subtrajectory_t& slice, roaring::Roaring& potentially_matching_trajs){
+            int zeroes = 0;
+            float sq_dist = query_distance * query_distance;
+            //std::cout << "populating at distance  "<< query_distance << std::endl; 
+            int highest_index = 0;
+            int iterations =0;
+            
+            //ARTIGIANALE:
+            roaring::Roaring matching_trajectories{};
+            if(fsg.is_intermediate(column_index)){
+                for(auto tid: potentially_matching_trajs){
+                    
+                    index_t trajectory_offset = sample.get_first_point_in_trajectory(tid);
+                    int i =0;
+                    while (i<sample.get_trajectory_size(tid)-1){
+                        auto d_ij = distance_function_t{}(sample[trajectory_offset + i], point); //FI
+                        if (d_ij <= sq_dist ){
+                            //std::cout << "d_ij for i "<< i<<" and j "<< column_index << " is "<< d_ij << " while sq_dist is "<< sq_dist<<std::endl;
+                            bool potential_connection = fsg.add_zero_with_id_respecting_labels(i,column_index, this->sample);
+                            if(potential_connection){
+                                
+                                matching_trajectories.add(sample.get_id_at(i));
+
+                            }
+
+                        } 
+                        i++;
+                    }
+
+                }
+            }
+            else{
+                //TODO: retrieve from a grid
+                for (int i = slice.first; i<=slice.second; i++){
+                iterations++;
+                auto d_ij = distance_function_t{}(sample[i], point); //FI
+                if (d_ij <= sq_dist ){
+                    //std::cout << "d_ij for i "<< i<<" and j "<< column_index << " is "<< d_ij << " while sq_dist is "<< sq_dist<<std::endl;
+                    fsg.add_zero_with_id_respecting_labels(i, column_index, this->sample);
+                    matching_trajectories.add(sample.get_id_at(i));
+                    zeroes++;
+
+                } 
+                }
+            }
+            //std::cout << zeroes<< std::endl;
+            //std::cout<< "i create columns without sf"<< std::endl;
+            //assert(iterations == sample.get_actual_size());
+
+            //possibly, these are less than the subset i am selecting them from 
+            return matching_trajectories;
+        }
+        
+        */
+
         //Populates all columns of the free space graph (from left to right) for a single pathlet_tree, against a specific slice of the sample
         void populate_all_columns_with_labels_for_single_slice(free_space_graph_t& fsg, subtrajectory_t& slice, trajectory_t& pathlet_mother, binary_pathlet_tree_t& pathlet_tree){
 
@@ -2157,6 +2438,102 @@ class frequent_subtrajectory_algo{
 
 
         }
+        
+        /*
+        void pruned_fsg_population(free_space_graph_flexible_t& fsg, subtrajectory_t& slice, trajectory_t& pathlet_mother, binary_pathlet_tree_t& pathlet_tree){
+
+            int num_col = pathlet_mother.get_actual_size();
+            std::cout << std::format("I am building flexible FSG for PM {}, SLICE {}-{}, MIN LENGTH {}\n", pathlet_mother.get_id_at(0), slice.first, slice.second,output_config.min_length);
+            
+
+
+            //Retrieve Nodes at the last level
+            auto base_pathlets = pathlet_tree.getMinLengthPathletsAtLowLevels(output_config.min_length);
+
+            roaring::Roaring landmark_idxs{};
+            roaring::Roaring standalone_idxs{};
+            
+            
+            std::cout<< std::format("Base Pathlets are : \n");
+            for (auto& base_pathlet : base_pathlets){
+                landmark_idxs.add(base_pathlet.pathlet.first);
+                standalone_idxs.add(base_pathlet.pathlet.second);
+                std::cout << std::format("*From {} to {}\n", base_pathlet.pathlet.first, base_pathlet.pathlet.second);
+
+            }
+
+            //Add the empty nodes at the vector of the lowest node for level in the fsg.
+            //Use new_column(idx) method in the fsg
+            //TODO: they can both be true if the pathlet has length 1-> manage it here and in the fsg
+            
+            for(index_t idx =0; idx<pathlet_mother.get_actual_size(); idx++){
+
+                if(landmark_idxs.contains(idx)){
+                    fsg.new_column(idx, true, false);
+                }
+                else if(standalone_idxs.contains(idx)){
+                    fsg.new_column(idx, false, true);
+                }
+                else{
+                    fsg.new_column(idx, false, false);
+                }
+
+            }
+            std::sort(base_pathlets.begin(), base_pathlets.end());
+            for (auto& base_pathlet : base_pathlets){
+                std::cout<< std::format("Examining base pathlet {} - {}\n", base_pathlet.pathlet.first, base_pathlet.pathlet.second );
+                //Step -1: get point beginning and end of base_pathlet
+                point_t beginning = pathlet_mother[base_pathlet.pathlet.first];
+                point_t end = pathlet_mother[base_pathlet.pathlet.second];
+                //Step 0: initialize an empty potentially matching ids data structure. -> skip this cause i write it in the nodes               
+                //roaring::Roaring potentially_matching_ds();
+                //Step 1: Add beginning column to the fsg.
+                roaring::Roaring temp{};
+                roaring::Roaring beginning_matches = this->populate_column_with_labels_for_single_slice(fsg, beginning, this->distance_threshold, base_pathlet.pathlet.first, slice, temp);
+                
+                std::cout << std::format("Potentially Matching Trajectories (after beginnings insertion): {}\n", RangeRoaringBitmap<space>(beginning_matches).to_string());
+                std::cout << "The FSG now is : \n";
+                std::cout << fsg.to_string(sample, slice)<< std::endl;
+                //Step 2: add end column to the fsg (if different from the beginning)
+                
+                roaring::Roaring end_matches = this->populate_column_with_labels_for_single_slice(fsg, end, this->distance_threshold, base_pathlet.pathlet.second, slice, temp);
+                std::cout << "The FSG now is : \n";
+                std::cout << fsg.to_string(sample, slice)<< std::endl;
+                
+                //Step 3 & 4: retrieve trajectories that match with the beginning and end, and compute intersection
+                //Step 5: Keep the potential matches inside the base_pathlet
+                base_pathlet.supporting_trajectories = end_matches & beginning_matches;
+                std::cout<< std::format("Potentially Matching Trajectories (after ends insertion): {}\n", RangeRoaringBitmap<space>(base_pathlet.supporting_trajectories).to_string());
+
+                //Step 6: iterate through all points in the pathlet and if one column does not stitch for a potentially matching tid, remove it from the potentially matching ds.
+                for(int i=base_pathlet.pathlet.first+1; i<base_pathlet.pathlet.second; i++){
+
+                    base_pathlet.supporting_trajectories &= this->populate_column_with_labels_for_single_slice(fsg,pathlet_mother[i],this->distance_threshold, i, slice, base_pathlet.supporting_trajectories);
+                    std::cout<< std::format("Potentially Matching Trajectories (after index {} insertion): {}\n",i, RangeRoaringBitmap<space>(base_pathlet.supporting_trajectories).to_string());
+
+                }
+
+                //Step 7: stitch the last point of the pathelet. 
+                fsg.stitch(base_pathlet.pathlet.second-1, base_pathlet.pathlet.second, this->sample);
+
+            }
+
+            // At this point i have valid portions of the fsg (valid == querable) for the base pathlets. I manage the query from 
+
+            //It only remains to stitch the columns at the boundaries, from left to right, to ensure correctness...
+            //Collect extremes in increasing order from the base_pathlets vector
+            //Stitch consecutive elements (assert they differ of 1)
+            for(index_t i= 0; i<pathlet_mother.get_actual_size()-1; i++){
+
+                if(fsg.is_standalone(i)){
+                    fsg.stitch(i, i+1, this->sample);
+                }
+
+            }
+
+        }
+        */
+
         
         std::vector<int> POWERS_OF_TWO;
         trajectory_t sample;

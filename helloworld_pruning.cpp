@@ -52,10 +52,6 @@ int main(int argc, char** argv){
                     output_config.maximal,
                 "Whether to keep only the maximal ones (0 or 1).")
                 ->transform(CLI::CheckedTransformer(std::map<std::string, bool>{{"0", false}, {"1", true}}));
-    app.add_option("-l, --min_length",
-                    output_config.min_length,
-                    "The minimum length of the pathlets to be kept.")
-                    ->default_val(1);
     app.add_option("-k, --keep_matching_ids",
                     output_config.keep_matching_ids,
                     "Whether to keep the ids of the trajectories supporting each pathlet (0 or 1).")

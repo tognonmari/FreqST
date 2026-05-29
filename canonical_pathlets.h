@@ -42,6 +42,14 @@ class PathletNode{
         inline bool is_contained_by(const PathletNode& other){return other.pathlet.first<=this->pathlet.first && other.pathlet.second>=this->pathlet.second;}
         inline roaring::Roaring getSupportingTrajectories(){return this->supporting_trajectories;}
         inline bool isLeaf() {return left_child ==-1 && right_child == -1;}
+        bool operator<(const PathletNode& other) const {
+            if (this->pathlet.first != other.pathlet.first) {
+                return this->pathlet.first < other.pathlet.first;
+            }
+            // Strict Weak Ordering Tie-Breaker (Highly Recommended)
+            return this->pathlet.second < other.pathlet.second;
+        }
+        
 };
 
 //represents a collection of pathlets organized as a tree, based on a subtrajectory taken from a trajectory collection
