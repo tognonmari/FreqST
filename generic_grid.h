@@ -52,11 +52,21 @@ class LowDimensionalGrid{
 
             
         };
+    
+    
     private:
+        struct CellContent{
+
+            std::map<point_identifier_t, std::pair<std::vector<point_t>, std::vector<point_identifier_t>>> map;
+            int total_points = 0;
+            int last_seen_tid = -1;
+
+        };
+
         using kernel = space::kernel;
         using distance_function_t = space::distance_function_t;
         using distance_t = space::distance_function_t::distance_t;
-        using cell_content_t =std::map<point_identifier_t, std::pair<std::vector<point_t>, std::vector<point_identifier_t>>>;
+        using cell_content_t = CellContent;
         static constexpr std::size_t dimension = space::dimension::value;
         using vector_t = std::conditional_t<(dimension==2), typename kernel::Vector_2, std::conditional_t<(dimension==3), typename kernel::Vector_3, void>>;
 
@@ -75,10 +85,12 @@ class LowDimensionalGrid{
 
             CellKey<dimension> key = compute_cell_key(point);
             if(! point_memorization){
-                grid[key][id];
+                grid[key].map[id];
+                grid[key].total_points++;
             }
             else{
-                grid[key][id].first.push_back(point);
+                grid[key].map[id].first.push_back(point);
+                grid[key].total_points++;
             }
 
         }
@@ -87,16 +99,34 @@ class LowDimensionalGrid{
 
             CellKey<dimension> key = compute_cell_key(point);
             if(! point_memorization){
-                grid[key][id].second.push_back(second_informational_id);
+                grid[key].map[id].second.push_back(second_informational_id);
+                grid[key].total_points++;
             }
             else{
-                grid[key][id].first.push_back(point);
-                grid[key][id].second.push_back(second_informational_id);
+                grid[key].map[id].first.push_back(point);
+                grid[key].map[id].second.push_back(second_informational_id);
+                grid[key].total_points++;
             }
 
 
         }
 
+        std::array<result_t,2> search(point_t point, distance_t search_distance_unsquared, point_identifier_t tid){
+
+            //Identify which cells I need to visit
+            auto bounds = query_cell_delimiters(point, search_distance_unsquared);
+            //std::cout << "CELL BOUNDS "<< bounds.first.to_string()<< " AND "<< bounds.second.to_string()<<std::endl;
+            
+            //Iterate over the visting cells 
+            std::array<result_t, 2> intersecting_cells_points;
+            //Define a lambda to pass this as argument
+            auto query_cell_func = [this, tid](CellKey<dimension>& cell, std::array<result_t,2>& output,point_t& point,distance_t dist, point_identifier_t queried_tid){
+                this->query_cell(cell, point, dist, output, tid);
+            };
+            this->get_points_in_ball_intersecting_cells<dimension>(bounds.first, bounds.second, bounds.first, query_cell_func, intersecting_cells_points, point, search_distance_unsquared, 0, tid);
+            return intersecting_cells_points;
+        }
+        /*
         std::array<result_t,2> search(point_t point, distance_t search_distance_unsquared){
 
             //Identify which cells I need to visit
@@ -110,6 +140,24 @@ class LowDimensionalGrid{
                 this->query_cell(cell, point, dist, output);
             };
             this->get_points_in_ball_intersecting_cells<dimension>(bounds.first, bounds.second, bounds.first, query_cell_func, intersecting_cells_points, point, search_distance_unsquared, 0);
+            return intersecting_cells_points;
+        }
+        
+        */
+
+        int count(point_t point, distance_t search_distance_unsquared, point_identifier_t tid){
+
+            //Identify which cells I need to visit
+            auto bounds = query_cell_delimiters(point, search_distance_unsquared);
+            //std::cout << "CELL BOUNDS "<< bounds.first.to_string()<< " AND "<< bounds.second.to_string()<<std::endl;
+            
+            //Iterate over the visting cells 
+            int intersecting_cells_points = 0;
+            //Define a lambda to pass this as argument
+            auto query_cell_func = [this, tid](CellKey<dimension>& cell, int& output,point_t& point,distance_t dist, point_identifier_t queried_tid){
+                this->count_cell(cell, point, dist, output, tid);
+            };
+            this->get_counts_in_ball_intesecting_cells<dimension>(bounds.first, bounds.second, bounds.first, query_cell_func, intersecting_cells_points, point, search_distance_unsquared, 0, tid);
             return intersecting_cells_points;
         }
 
@@ -149,7 +197,7 @@ class LowDimensionalGrid{
         const double grid_side;
         const bool point_memorization;
         //Verify whether the cell can have any intersection with the ball, then add points if some intersection exists
-        void query_cell(CellKey<dimension>& cell, point_t& center, distance_t radius, std::array<result_t,2>& output){
+        void query_cell(CellKey<dimension>& cell, point_t& center, distance_t radius, std::array<result_t,2>& output, point_identifier_t queried_tid){
             //Assert the cell is not empty (i.e. assert it exists in the map)
             auto iter = grid.find(cell);
             if (iter==grid.end()){
@@ -173,41 +221,108 @@ class LowDimensionalGrid{
                 }
 
             }
-
+ 
             if(all_included){
-                for (auto& pair : grid[cell]){
-                    output[0][pair.first].first.insert(output[0][pair.first].first.end(), pair.second.first.begin(), pair.second.first.end());
-                    output[0][pair.first].second.insert(output[0][pair.first].second.end(), pair.second.second.begin(), pair.second.second.end());
+                for (auto& pair : grid[cell].map){
+                    //I add to the output only points which i have not yet seen in the current trajectory. This is mixing the nature of grid_range_query and generic-grid from a design perspective
+                    if(grid[cell].last_seen_tid != queried_tid){
+                        output[0][pair.first].first.insert(output[0][pair.first].first.end(), pair.second.first.begin(), pair.second.first.end());
+                        output[0][pair.first].second.insert(output[0][pair.first].second.end(), pair.second.second.begin(), pair.second.second.end());
+                    }
                 }
                 //output[0].insert(output[0].end(),grid[cell].begin(), grid[cell].end());
             }
             else if (partial_intersection){
                 //Dubious range pertainence
-                for (auto& pair : grid[cell]){
-                    output[1][pair.first].first.insert(output[1][pair.first].first.end(), pair.second.first.begin(), pair.second.first.end());
-                    output[1][pair.first].second.insert(output[1][pair.first].second.end(), pair.second.second.begin(), pair.second.second.end());
+                for (auto& pair : grid[cell].map){
+                    if(grid[cell].last_seen_tid != queried_tid){
+                        output[1][pair.first].first.insert(output[1][pair.first].first.end(), pair.second.first.begin(), pair.second.first.end());
+                        output[1][pair.first].second.insert(output[1][pair.first].second.end(), pair.second.second.begin(), pair.second.second.end());
+                    }
                 }
             }
+            grid[cell].last_seen_tid = queried_tid;
             return;
             //std::cout << "Cell "<< cell.to_string() <<" doesn't intersect the range."<<std::endl;
             
         }
         //Dimension sensitive loop unfolding
         template<std::size_t dim, typename query_func>
-        void  get_points_in_ball_intersecting_cells(const CellKey<dim>& min_cell, const CellKey<dim>& max_cell, CellKey<dim> current, query_func&& my_function, std::array<result_t,2>& output, point_t center, distance_t radius, std::size_t d =0){
+        void  get_points_in_ball_intersecting_cells(const CellKey<dim>& min_cell, const CellKey<dim>& max_cell, CellKey<dim> current, query_func&& my_function, std::array<result_t,2>& output, point_t center, distance_t radius, std::size_t d =0, point_identifier_t queried_tid=-1){
 
             if (d==dim){
-                my_function(current, output,center, radius);
+                my_function(current, output,center, radius, queried_tid);
                 return;
             }
             for (int i= min_cell.discrete_cell_coordinates[d]; i<=max_cell.discrete_cell_coordinates[d]; i++){
-
+                // for each visited cell remark that we have just found the cell 
                 current.discrete_cell_coordinates[d] = i;
-                get_points_in_ball_intersecting_cells<dim>(min_cell,max_cell, current, my_function,output, center, radius,  d+1);
+                get_points_in_ball_intersecting_cells<dim>(min_cell,max_cell, current, my_function,output, center, radius,  d+1, queried_tid);
             }
 
         }
 
+        void count_cell(CellKey<dimension>& cell, point_t& center, distance_t radius, int& output, point_identifier_t queried_tid){
+            //Assert the cell is not empty (i.e. assert it exists in the map)
+            auto iter = grid.find(cell);
+            if (iter==grid.end()){
+                //std::cout << "Cell "<< cell.to_string()<<" is empty"<< std::endl;
+                return;
+            }
+            //std::cout << "The cell "<<cell.to_string()<<" is not empty and i am indeed adding the points to the output"<< std::endl;
+            //If a cell has all vertices inside the range, then add them to the sure vertices [position 0 in the result array]
+            //Assert some intersection exists: get cell vertices' list and check whether any of them is below the radius threshold
+            bool all_included =true;
+            bool partial_intersection = false;
+            for (point_t vertex : get_cell_vertices(cell)){
+                //If some intersection is possible, append the cell content to the output.
+                //Also, I add some fuzzyness for corner cases: better safe than sorry
+                if (distance_function_t{}(vertex, center)<= radius*radius* 1.00001){
+                    //std::cout << "The cell "<<cell.to_string()<<" is not empty and i am indeed adding the points to the output"<< std::endl;
+                    partial_intersection = true;
+                }
+                else{
+                    all_included = false;
+                }
+
+            }
+ 
+            if(all_included){
+                
+                //I add to the output only points which i have not yet seen in the current trajectory. This is mixing the nature of grid_range_query and generic-grid from a design perspective
+                if(grid[cell].last_seen_tid != queried_tid){
+                    output += grid[cell].total_points;
+                }
+                
+                //output[0].insert(output[0].end(),grid[cell].begin(), grid[cell].end());
+            }
+            else if (partial_intersection){
+                
+                if(grid[cell].last_seen_tid != queried_tid){
+                    output += grid[cell].total_points;
+                }
+                
+            }
+            grid[cell].last_seen_tid = queried_tid;
+            return;
+            //std::cout << "Cell "<< cell.to_string() <<" doesn't intersect the range."<<std::endl;
+            
+        }
+        //Dimension sensitive loop unfolding
+        template<std::size_t dim, typename query_func>
+        void  get_counts_in_ball_intesecting_cells(const CellKey<dim>& min_cell, const CellKey<dim>& max_cell, CellKey<dim> current, query_func&& my_function, int& output, point_t center, distance_t radius, std::size_t d =0, point_identifier_t queried_tid=-1){
+
+            if (d==dim){
+                my_function(current, output,center, radius, queried_tid);
+                return;
+            }
+            for (int i= min_cell.discrete_cell_coordinates[d]; i<=max_cell.discrete_cell_coordinates[d]; i++){
+                // for each visited cell remark that we have just found the cell 
+                current.discrete_cell_coordinates[d] = i;
+                get_counts_in_ball_intesecting_cells<dim>(min_cell,max_cell, current, my_function, output, center, radius,  d+1, queried_tid);
+            }
+
+        }
         
         std::vector<point_t>  get_cell_vertices(CellKey<dimension>& cell_id){
 

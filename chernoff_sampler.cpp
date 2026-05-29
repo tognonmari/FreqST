@@ -43,7 +43,8 @@ enum class sampling_mode {
     pathlets_vc = 10,
     intersection_pathlets_vc = 11,
     pathlet_aware_vc = 12,
-    pathlet_aware_intersection_vc = 13
+    pathlet_aware_intersection_vc = 13,
+    turbo_rough_vc_no_erase = 14
 };
 
 int main(int argc, char** argv){
@@ -248,6 +249,15 @@ int main(int argc, char** argv){
             auto end = chrono::high_resolution_clock::now();
             auto duration = duration_cast<chrono::milliseconds>(end - start);
             std::cout << "TIME: "<<duration.count() << std::endl;
+            break;
+        }
+        case sampling_mode::turbo_rough_vc_no_erase:{
+            auto start = chrono::high_resolution_clock::now();
+            sampler.generate_turbo_rough_vc_no_erase_sample();
+            auto end = chrono::high_resolution_clock::now();
+            auto duration = duration_cast<chrono::milliseconds>(end - start);
+            std::cout << "TIME: "<<duration.count() << std::endl;
+            //sampler.dump_sample_to_file(std::format("{}/roughvc_{}_{}_{}_{}.txt", outfiledir, epsilon, delta, seed, radius));
             break;
         }
     } 
