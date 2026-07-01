@@ -12,7 +12,6 @@
 #include "roaring.hh"
 
 #include "free_space_graph_free_axis.h"
-#include "free_space_graph_free_axis_flexible.h"
 #include "kdtree_range_search.h"
 #include "metric_space.h"
 #include "io.h"
@@ -1410,6 +1409,7 @@ class freq_subtrajectory_sampler{
                 vc_dim++;
             }
         }
+    }
         
         int vc_dim_no_erase(){
 
@@ -1866,7 +1866,7 @@ class frequent_subtrajectory_algo{
         using subtrajectory_t = trajectory_t::subtrajectory_t;
         using index_t = trajectory_t::index_t;
         using free_space_graph_t = free_space_graph_free_axis<space>;
-        using free_space_graph_flexible_t = free_space_graph_free_axis_flexible<space>;
+        
         using point_t = space::point_t;
         using distance_function_t = space::distance_function_t;
         using distance_t = distance_function_t::distance_t;
