@@ -34,6 +34,7 @@ int main(int argc, char** argv){
     std::string infilename, outfilename, pathlet_file_name, netfilename;
     output_config.min_length = minimum_length;
     bool detailed_outcome = false;
+    bool skip_frequency_estimate = false;
     //Step 2: parse the input parameters
     
     CLI::App app{"Frequent Subtrajectory Extraction"};
@@ -67,6 +68,10 @@ int main(int argc, char** argv){
                     detailed_outcome,
                     "Whether to count the number of pruned pathlets.")
                     ->transform(CLI::CheckedTransformer(std::map<std::string, bool>{{"0", false}, {"1", true}}));
+    app.add_option("-s, --skip_frequency_estimate",
+                    skip_frequency_estimate,
+                    "Whether to count the number of pruned pathlets.")
+                    ->transform(CLI::CheckedTransformer(std::map<std::string, bool>{{"0", false}, {"1", true}}));
     app.add_option("pathlets",
                     pathlet_file_name,
                     "The file with the pathlets.")
@@ -85,6 +90,19 @@ int main(int argc, char** argv){
     range_search_t rs(dataset);
     
     frequent_subtrajectory_algo_t algo(dataset, rs, pathlet_file_name, frequency_threshold, radius, output_config); 
+    if(detailed_outcome){
+        trajectory_t pathlets = read_trajectory_from_file<space>(pathlet_file_name);
+        freq_subtrajectory_sampler<space> sampler(dataset, pathlets, epsilon, delta, radius, output_config.min_length, 0, 0.1, false, false);
+        sampler.fill_beginnings_of_pathlet_vector();
+
+        int num_pathlets = 0;
+        for (const auto& pair : sampler.get_pathlet_beginnings()){
+
+            num_pathlets += pair.second.second.size();
+
+        }
+        std::cout << "PATHLETS : "<< num_pathlets << std::endl;
+    }
     auto start = chrono::high_resolution_clock::now();
     if (!netfilename.empty()){
 
@@ -98,15 +116,21 @@ int main(int argc, char** argv){
         auto duration = duration_cast<chrono::milliseconds>(stop - start);
         std::cout << "TIME FOR NET FILTERING : "<<duration.count()<< std::endl;
     }
+
+    if(skip_frequency_estimate){
+        return 0;
+    }
+        
     start = chrono::high_resolution_clock::now();
     algo.compute_frequent_pathlets_with_trajectory_slicing();
     //algo.compute_all_frequent_pathlets();
     stop =  chrono::high_resolution_clock::now();
-     
+    
     auto duration = duration_cast<chrono::milliseconds>(stop - start);
     std::cout<< "TIME : "<< duration.count()<< std::endl;
     
     algo.dump_collected_pathlets_to_file(outfilename);
+    
     
     return 0;
 }
