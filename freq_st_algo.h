@@ -1996,12 +1996,12 @@ class frequent_subtrajectory_algo{
         }
         */
 
-        void compute_frequent_pathlets_with_trajectory_slicing(int suggested_chunk_size = -1){
+        void compute_frequent_pathlets_with_trajectory_slicing(int suggested_chunk_size = -1, bool detailed_outcome = false){
         
             std::ifstream input_stream(this->dataset_location); //input stream that reads trajectories upon which we build the pathlets
 
             int sample_size = this->sample.num_trajectories_not_consecutive();
-            
+            int num_skipped_pathlets = 0;
             int chunk_size = 50;//int(this-> sample.num_trajectories_not_consecutive()/50);
             //If i have an input chunk size 
             if (suggested_chunk_size >0){
@@ -2057,6 +2057,10 @@ class frequent_subtrajectory_algo{
                             no_frequent_for_this_tree = true;
                             break;
                         }
+                        if(detailed_outcome){
+
+                            num_skipped_pathlets += num_spared_pathlets(pathlet_tree);
+                        }
 
                     }
                     
@@ -2075,9 +2079,14 @@ class frequent_subtrajectory_algo{
                 //std::cout<< "I have found some frequent"<<std::endl;
                 this->collect_frequent_pathlets_from_single_tree(pathlet_tree);
                 }
+
             }
 
+            if(suggested_chunk_size >0 && detailed_outcome){
 
+                std::cout << std::format("SKIPPED PATHLETS : {}\n", num_skipped_pathlets);
+
+            }
         }
 
         void compute_pathlet_filter_with_theta_net(std::string netfilename, bool detailed_outcome){

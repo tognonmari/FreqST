@@ -34,11 +34,8 @@ int main(int argc, char** argv){
     std::string infilename, outfilename, pathlet_file_name, netfilename;
     output_config.min_length = minimum_length;
     bool detailed_outcome = false;
-<<<<<<< HEAD
     int chunk_size = 50;
-=======
     bool skip_frequency_estimate = false;
->>>>>>> a819597e0c2779f8083dec1f7719b1af9033208c
     //Step 2: parse the input parameters
     
     CLI::App app{"Frequent Subtrajectory Extraction"};
