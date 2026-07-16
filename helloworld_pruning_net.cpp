@@ -33,6 +33,7 @@ int main(int argc, char** argv){
     int minimum_length = 1;
     std::string infilename, outfilename, pathlet_file_name, netfilename;
     output_config.min_length = minimum_length;
+    bool detailed_outcome = false;
     //Step 2: parse the input parameters
     
     CLI::App app{"Frequent Subtrajectory Extraction"};
@@ -62,6 +63,10 @@ int main(int argc, char** argv){
                     output_config.keep_matching_ids,
                     "Whether to keep the ids of the trajectories supporting each pathlet (0 or 1).")
                     ->transform(CLI::CheckedTransformer(std::map<std::string, bool>{{"0", false}, {"1", true}}));
+    app.add_option("-d, --detailed_pruning_report",
+                    detailed_outcome,
+                    "Whether to count the number of pruned pathlets.")
+                    ->transform(CLI::CheckedTransformer(std::map<std::string, bool>{{"0", false}, {"1", true}}));
     app.add_option("pathlets",
                     pathlet_file_name,
                     "The file with the pathlets.")
@@ -83,8 +88,8 @@ int main(int argc, char** argv){
     auto start = chrono::high_resolution_clock::now();
     if (!netfilename.empty()){
 
-        algo.compute_pathlet_filter_with_theta_net(netfilename);
-
+        algo.compute_pathlet_filter_with_theta_net(netfilename, detailed_outcome);
+        
     }
 
     auto stop =  chrono::high_resolution_clock::now();
@@ -102,6 +107,6 @@ int main(int argc, char** argv){
     std::cout<< "TIME : "<< duration.count()<< std::endl;
     
     algo.dump_collected_pathlets_to_file(outfilename);
-
+    
     return 0;
 }
