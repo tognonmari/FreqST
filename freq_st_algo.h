@@ -2000,13 +2000,17 @@ class frequent_subtrajectory_algo{
         }
         */
 
-        void compute_frequent_pathlets_with_trajectory_slicing(){
+        void compute_frequent_pathlets_with_trajectory_slicing(int suggested_chunk_size = -1){
         
             std::ifstream input_stream(this->dataset_location); //input stream that reads trajectories upon which we build the pathlets
 
             int sample_size = this->sample.num_trajectories_not_consecutive();
-            int chunk_size = 50;//int(this-> sample.num_trajectories_not_consecutive()/50);
             
+            int chunk_size = 50;//int(this-> sample.num_trajectories_not_consecutive()/50);
+            //If i have an input chunk size 
+            if (suggested_chunk_size >0){
+                chunk_size = suggested_chunk_size;
+            }
             
             while(!input_stream.eof()){
                 //One pathlet tree at a time
@@ -2049,6 +2053,15 @@ class frequent_subtrajectory_algo{
                     if(!some_potentially_frequent_exists(pathlet_tree, num_visited_trajectories, sample_size)){
                         no_frequent_for_this_tree = true;
                         break;
+                    }
+                    
+                    if(suggested_chunk_size>0 && num_visited_trajectories<=chunk_size){
+                        //Run the check if someone matched against the """net"""
+                        if(!some_pathlet_appears_from_pathlet_mother(pathlet_tree)){
+                            no_frequent_for_this_tree = true;
+                            break;
+                        }
+
                     }
                     
                     

@@ -34,6 +34,7 @@ int main(int argc, char** argv){
     std::string infilename, outfilename, pathlet_file_name, netfilename;
     output_config.min_length = minimum_length;
     bool detailed_outcome = false;
+    int chunk_size = 50;
     //Step 2: parse the input parameters
     
     CLI::App app{"Frequent Subtrajectory Extraction"};
@@ -44,6 +45,9 @@ int main(int argc, char** argv){
     app.add_option("-l,--length",
                    output_config.min_length,
                    "The minimum length of canonical pathlets of interest.");
+    app.add_option("-c,--chunk_size",
+                   chunk_size,
+                   "The size of the net-like chunk employed to prune infrequent patterns.");
     app.add_option("-f,--f",
                    frequency_threshold,
                    "The fraction of trajectories the subtrajectories must appear in in order to be considered frequent.")
@@ -99,7 +103,7 @@ int main(int argc, char** argv){
         std::cout << "TIME FOR NET FILTERING : "<<duration.count()<< std::endl;
     }
     start = chrono::high_resolution_clock::now();
-    algo.compute_frequent_pathlets_with_trajectory_slicing();
+    algo.compute_frequent_pathlets_with_trajectory_slicing(chunk_size);
     //algo.compute_all_frequent_pathlets();
     stop =  chrono::high_resolution_clock::now();
      
