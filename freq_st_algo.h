@@ -2071,7 +2071,7 @@ class frequent_subtrajectory_algo{
 
         }
 
-        void compute_pathlet_filter_with_theta_net(std::string netfilename){
+        void compute_pathlet_filter_with_theta_net(std::string netfilename, bool detailed_outcome){
 
             trajectory_t net_sample = read_trajectory_from_file<space>(netfilename);
 
@@ -2126,13 +2126,19 @@ class frequent_subtrajectory_algo{
                 //COLLECT THE FREQUENT ONES 
                 if (!some_pathlet_appears_from_pathlet_mother(pathlet_tree)){
                 //std::cout<< std::format("I am adding {} to forbidden trajectories \n", pathlet_tree.getTrajectoryId());
-                this->forbidden_pathlet_mothers.add(pathlet_tree.getTrajectoryId());
+                    this->forbidden_pathlet_mothers.add(pathlet_tree.getTrajectoryId());
+                    if(detailed_outcome){
+                        this->num_spared_pathlets += get_spared_pathlets(pathlet_tree);
+                    }
                 }
             }
 
             //for (auto item : forbidden_pathlet_mothers){
             //    std::cout << item <<std::endl;
             //}
+            if (detailed_outcome){
+                std::cout << std::format("PRUNED PATHLETS : {}\n", this->num_spared_pathlets);
+            }
         }
         //FLUSH THE FREQUENT PATHLETS TO A FILE
         //Format for a line: start_idx end_idx pathlet_mother_id frequency
@@ -2547,6 +2553,36 @@ class frequent_subtrajectory_algo{
             return false;
         }
 
+        int get_spared_pathlets(binary_pathlet_tree_t& pathlet_tree){
+
+            // Count the number of spared_pathlets
+            int d = pathlet_tree.getDepth(); 
+
+            //int num_sampled_trajs = this->sample.num_trajectories_not_consecutive();
+            int spared = 0;
+
+            for (int level = d; d>=0; d--){
+
+                int level_beginning = int(POWERS_OF_TWO[d])-1;
+
+                //Traverse the tree from left to right
+                for (int offset = 0; offset <=level_beginning; offset++){
+
+                    int position = level_beginning + offset;
+                    auto& pn = pathlet_tree.getNodeAt(position);
+                    //std::cout << "I am visitingq querying pathlet "<< pn.getPathlet().first <<" "<< pn.getPathlet().second<< std::endl;
+                    if(pn.isNULL || pn.getLength()<this->output_config.min_length){
+                        
+                        continue;
+
+                    }
+
+                    spared++;
+                }
+            }
+
+            return spared;
+        }
 
         
         std::vector<int> POWERS_OF_TWO;
@@ -2558,7 +2594,7 @@ class frequent_subtrajectory_algo{
         int integer_frequency_threshold;
         freq_subtrajectory_algo_output_config output_config;
         roaring::Roaring forbidden_pathlet_mothers;
-        
+        int  num_spared_pathlets =0;
 };
 };
 
