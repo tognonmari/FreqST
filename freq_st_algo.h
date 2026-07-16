@@ -12,7 +12,6 @@
 #include "roaring.hh"
 
 #include "free_space_graph_free_axis.h"
-#include "free_space_graph_free_axis_flexible.h"
 #include "kdtree_range_search.h"
 #include "metric_space.h"
 #include "io.h"
@@ -1350,11 +1349,11 @@ class freq_subtrajectory_sampler{
                     
                     for (const auto idx: search_ends.search(pathlet_point, this->distance_threshold*distance_threshold, pathlet_idx)) {
 
-                        traj_set_ends.insert(idx);
-
-                    }
+                    traj_set_ends.insert(idx);
 
                 }
+
+                
                 /*
                 
                 if( thorough && min_length >=3){
@@ -1365,13 +1364,9 @@ class freq_subtrajectory_sampler{
                     c.push_back(floor(log2(traj_set.size()) + 1));
                 }
                 */
-               if( thorough && min_length >=3){
-                    c.push_back(std::count_if(traj_set.begin(), traj_set.end(), [&](const auto& x){ return traj_set_ends.contains(x); }) + 1);
+               
+                c.push_back(std::count_if(traj_set.begin(), traj_set.end(), [&](const auto& x){ return traj_set_ends.contains(x); }) + 1);
 
-                }
-                else{
-                    c.push_back(traj_set.size());
-                }
                 
             }
             std::sort(c.begin(),c.end(), std::greater<>());
@@ -1418,6 +1413,7 @@ class freq_subtrajectory_sampler{
                 vc_dim++;
             }
         }
+    }
         
         int vc_dim_no_erase(){
 
@@ -1874,7 +1870,7 @@ class frequent_subtrajectory_algo{
         using subtrajectory_t = trajectory_t::subtrajectory_t;
         using index_t = trajectory_t::index_t;
         using free_space_graph_t = free_space_graph_free_axis<space>;
-        using free_space_graph_flexible_t = free_space_graph_free_axis_flexible<space>;
+        
         using point_t = space::point_t;
         using distance_function_t = space::distance_function_t;
         using distance_t = distance_function_t::distance_t;

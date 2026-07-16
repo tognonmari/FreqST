@@ -303,7 +303,7 @@ class RangeRoaringBitmap{
             for (auto tid: range){
 
                 v.push_back(tid);
-                last_added = tid;
+                //last_added = tid;
             }
 
             return v;
@@ -524,19 +524,6 @@ class RangeRoaringBitmap64{
             }
             
             return s;
-
-        }
-
-        std::vector<id_t> to_vector() const{
-            std::vector<id_t> v;
-
-            for (auto tid: range){
-
-                v.push_back(tid);
-                last_added = tid;
-            }
-
-            return v;
 
         }
 
