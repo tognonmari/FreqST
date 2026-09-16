@@ -1877,6 +1877,7 @@ class frequent_subtrajectory_algo{
         using binary_pathlet_tree_t = BinaryPathletTree<space>;
         using range_search_t = kd_tree_range_search<space>;
         using id_t = trajectory_t::id_t;
+        using pathlet_matrix_t = PathletMatrix<space>;
         struct frequent_pathlet{
 
             std::pair<index_t,index_t> extremes;
@@ -1995,7 +1996,81 @@ class frequent_subtrajectory_algo{
 
         }
         */
+        void compute_frequent_subtrajectory_with_trajectory_slicing(int suggested_chunk_size = -1, bool detailed_outcome = false){
 
+            
+            std::ifstream input_stream(this->dataset_location); //input stream that reads trajectories upon which we build the pathlets
+
+            int sample_size = this->sample.num_trajectories_not_consecutive();
+            int num_skipped_pathlets = 0;
+            int chunk_size = 50;//int(this-> sample.num_trajectories_not_consecutive()/50);
+            //If i have an input chunk size 
+            if (suggested_chunk_size >0){
+                chunk_size = suggested_chunk_size;
+            }
+            
+            while(!input_stream.eof()){
+                //One pathlet tree at a time
+                trajectory_t pathlet_mother = this->read_next_transaction_from_file(input_stream);
+            
+                pathlet_matrix_t pathlet_tree(pathlet_mother, pathlet_mother.get_id_at(0),floor(log2(pathlet_mother.total_size())) + 1,1);
+                //std::cout <<"The transaction has id "<< pathlet_mother.get_id_at(0) <<std::endl;
+                if (forbidden_pathlet_mothers.contains(pathlet_mother.get_id_at(0))){
+
+                    continue; // I don't bother testing the pathlets if i know they are not frequent  
+
+                }
+                
+                bool no_frequent_for_this_tree = false;
+                int num_visited_trajectories = 0;
+                id_t next_first_id_of_chunk= this->sample.get_id_at(0);
+                subtrajectory_t chunk;
+                chunk.second = 0;
+                //std::cout << "Testing frequency for id "<< pathlet_mother.get_id_at(0)<< std::endl;
+
+                //Test the pathlet against the trajectories in a "chunk" and then update the chunk
+                while (chunk.second < sample.total_size()-1){
+                    num_visited_trajectories +=chunk_size;
+                    chunk = extract_chunked_slice(this->sample,next_first_id_of_chunk, chunk_size);
+                    /*
+                    
+                    slice.first = sample.get_first_point_in_trajectory(next_id);
+                    slice.second =  sample.get_first_point_in_trajectory(next_id) + sample.get_trajectory_size(next_id);
+                    */
+                    free_space_graph_t fsg(0);
+
+                    //POPULATE FSG
+                    //std::cout << fsg.to_string(sample,chunk) <<std::endl; 
+                    this->populate_all_columns_with_labels_for_single_slice(fsg, this->sample, chunk, pathlet_mother, pathlet_tree); //Should receive pathlet tree
+                    //std::cout << fsg.to_string(sample,chunk) <<std::endl; 
+                    this->query_and_update_counts_for_all_subtrajectories<free_space_graph_t>(this->sample, fsg, chunk, pathlet_tree);
+                                      
+                    
+                    if(chunk.second < sample.total_size()-1){
+
+                        id_t second_id = sample.get_id_at(chunk.second);
+
+                        next_first_id_of_chunk = sample.get_id_at(sample.get_first_point_in_trajectory(second_id) + sample.get_trajectory_size(second_id));
+
+                    }
+                }
+
+                //COLLECT THE FREQUENT ONES 
+                if (!no_frequent_for_this_tree){
+                //std::cout<< "I have found some frequent"<<std::endl;
+                this->collect_frequent_pathlets_from_single_matrix(pathlet_tree);
+                }
+
+            }
+
+            if(suggested_chunk_size >0 && detailed_outcome){
+
+                std::cout << std::format("SKIPPED PATHLETS : {}\n", num_skipped_pathlets);
+
+            }
+
+
+        }
         void compute_frequent_pathlets_with_trajectory_slicing(int suggested_chunk_size = -1, bool detailed_outcome = false){
         
             std::ifstream input_stream(this->dataset_location); //input stream that reads trajectories upon which we build the pathlets
@@ -2316,6 +2391,169 @@ class frequent_subtrajectory_algo{
                 }
             }
         }
+
+        void collect_frequent_pathlets_from_single_matrix(pathlet_matrix_t& pathlet_tree){
+            if (output_config.maximal) {
+                this->collect_maximal_frequent_subtrajectories_from_single_matrix(pathlet_tree);
+                return;
+            }
+
+            int support_length = pathlet_tree.getTrajectoryLength();
+
+            int num_sampled_trajs = this->sample.num_trajectories_not_consecutive();
+
+            for (int diagonal_length = 0; diagonal_length<=support_length-1; diagonal_length++){
+
+                //Traverse the tree from left to right
+                for (int j = 0; j <=support_length-1-diagonal_length; j++){
+
+                    
+                    auto& pn = pathlet_tree.getNodeAt(0+j, diagonal_length+j);
+                    //std::cout << "I am visitingq querying pathlet "<< pn.getPathlet().first <<" "<< pn.getPathlet().second<< std::endl;
+                    if(pn.isNULL ||!(pn.isFrequent())){
+                        
+                        continue;
+
+                    }
+
+                    int count = pn.frequency; 
+                    if(count >= this->integer_frequency_threshold)  {
+                        
+                        pathlet_tree.setEstimatedFrequency(0+j, diagonal_length+j, ((double)count / num_sampled_trajs));
+                        frequent_pathlet just_found;
+                        just_found.extremes = pn.getPathlet();
+                        just_found.pathlet_mother = (pathlet_tree.getTrajectoryId());
+                        just_found.frequency = ((double) count / num_sampled_trajs);
+                        just_found.supporting_trajectories = pn.getSupportingTrajectories();
+                        if ((just_found.extremes.second-just_found.extremes.first +1 )>=output_config.min_length){
+                            
+                            freq_pathlets.push_back(just_found);
+                        }
+                    }    
+
+                }
+            }
+        }
+
+
+        template <typename fsg_type>
+        void query_and_update_counts_for_all_subtrajectories(trajectory_t& unsliced_traj,fsg_type& fsg, subtrajectory_t& slice, pathlet_matrix_t& pathlet_tree){
+            int support_length = pathlet_tree.getTrajectoryLength();
+            for (int diagonal_length = 0; diagonal_length<= support_length-1; diagonal_length++){
+
+                for (int j = 0; j<= support_length-1-diagonal_length; j++){
+
+                    auto& pn = pathlet_tree.getNodeAt(0+j, diagonal_length+j);
+                    if(pn.isNULL ||!(pn.isFrequent())){
+                        if (!pn.isFrequent()){
+                        //std::cout<< "SEARCH PRUNING"<<std::endl;
+                        }
+                        continue;
+
+                    }
+                    
+                    std::set<id_t> matching_ids = fsg.query_one_pathlet_over_the_sample_with_labels_by_slice(unsliced_traj, pn.getPathlet(),1, slice); //SF IS HERE
+                    
+                    int count = matching_ids.size();
+                    if (this->output_config.keep_matching_ids){
+
+                        for (id_t idd : matching_ids){
+                            //if(pathlet_tree.getTrajectoryId() ==951 ||pathlet_tree.getTrajectoryId() ==1854 || pathlet_tree.getTrajectoryId() ==2237){
+                            //    if (idd ==951 ||idd ==1854 || idd ==2237){
+                                    //std::cout << "Pathlet "<< pn.getPathlet().first <<" "<< pn.getPathlet().second<<"of trajectory "<<pathlet_tree.getTrajectoryId()<<" has matches with tid "<< idd<< std::endl;
+                            //    }
+                            //}
+                            pn.addId(idd);
+                        }
+
+                    }
+                    
+                    //std::cout << "Pathlet "<< pn.getPathlet().first <<" "<< pn.getPathlet().second<<"has matches with "<< slice.first<<" "<< slice.second<< std::endl;
+                    
+                    //pn.frequency +=count;
+                    pathlet_tree.setEstimatedFrequency(0+j, diagonal_length+j, pathlet_tree.getNodeAt(0+j, diagonal_length+j).getFrequency() + count);
+                    
+                }
+
+            }
+
+
+        }
+
+        void collect_maximal_frequent_subtrajectories_from_single_matrix(pathlet_matrix_t& pathlet_tree){
+            int num_sampled_trajs = this->sample.num_trajectories_not_consecutive();
+            int support_length = pathlet_tree.getTrajectoryLength();
+            std::queue<std::pair<int,int>> nodes_to_visit;
+
+            nodes_to_visit.push(std::pair<int,int>(0, support_length-1));
+
+            //I found one maximal frequent at the root
+            if(pathlet_tree.getNodeAt(0,support_length-1).frequency>=this->integer_frequency_threshold){
+                PathletNode pn = pathlet_tree.getNodeAt(0,support_length-1);
+                frequent_pathlet just_found;
+                just_found.extremes = pn.getPathlet();
+                just_found.pathlet_mother = (pathlet_tree.getTrajectoryId());
+                just_found.frequency = pn.frequency/num_sampled_trajs;
+                
+                freq_pathlets.push_back(just_found);
+                return;
+            }
+            //TODO: clean up beacuse this is horrible
+            
+            PathletNode pn =pathlet_tree.getNodeAt(0, support_length-2);
+            if(!pn.isNULL && pn.getLength() > 1){
+                nodes_to_visit.push(std::pair<int,int>(0,support_length-2));
+            }
+
+            PathletNode pn1=pathlet_tree.getNodeAt(1,support_length-1);
+
+            if(!pn1.isNULL && pn1.getLength() > 1){
+
+                nodes_to_visit.push(std::pair<int,int>(1,support_length-1));
+
+            }
+
+            while(!nodes_to_visit.empty()){
+
+                std::pair<int,int> pathlet_idx = nodes_to_visit.front();
+                nodes_to_visit.pop();
+
+                if(pathlet_tree.getNodeAt(pathlet_idx.first, pathlet_idx.second).frequency>=this->integer_frequency_threshold){
+
+                    PathletNode pn = pathlet_tree.getNodeAt(pathlet_idx.first, pathlet_idx.second);
+                    frequent_pathlet just_found;
+                    just_found.extremes = pn.getPathlet();
+                    just_found.pathlet_mother = (pathlet_tree.getTrajectoryId());
+                    just_found.frequency = pn.frequency/num_sampled_trajs;
+                    freq_pathlets.push_back(just_found);                    
+
+                }
+                else{
+                    if(pathlet_idx.first==0){
+                        PathletNode pn =pathlet_tree.getNodeAt(pathlet_idx.first, pathlet_idx.second);
+                        if(!pn.isNULL && pn.getLength() > 1){
+                            nodes_to_visit.push(std::pair<int,int>(pathlet_idx.first, pathlet_idx.second-1));
+                            nodes_to_visit.push(std::pair<int,int>(pathlet_idx.first+1, pathlet_idx.second));
+                        }
+
+
+                    }
+                    else{
+                        if(pathlet_idx.first<support_length-1){
+                            if(!pn.isNULL && pn.getLength() > 1){
+
+                                nodes_to_visit.push(std::pair<int,int>(pathlet_idx.first+1, pathlet_idx.second));
+                            }
+                        }
+
+                    }
+
+                }
+
+            }
+
+        }
+
         //Queries the pathlets in pathlet_tree against the free space graph fsg, updating their counts when a match is found
         template <typename fsg_type>
         void query_and_update_counts_for_all_pathlets(trajectory_t& unsliced_traj,fsg_type& fsg, subtrajectory_t& slice, binary_pathlet_tree_t& pathlet_tree){
@@ -2514,6 +2752,29 @@ class frequent_subtrajectory_algo{
 
         //Populates all columns of the free space graph (from left to right) for a single pathlet_tree, against a specific slice of the sample
         void populate_all_columns_with_labels_for_single_slice(free_space_graph_t& fsg, trajectory_t& unsliced_traj, subtrajectory_t& slice, trajectory_t& pathlet_mother, binary_pathlet_tree_t& pathlet_tree){
+
+            int num_col = pathlet_mother.get_actual_size();
+            
+            for (int j = 0; j< num_col; j++){
+                // If a point is not frequent and i already know it, skip the distance computations 
+                //get the node associated to that point
+                //PathletNode pn = pathlet_tree.getPointPathletNode(j);
+                //if(pn.isFrequent()){
+                populate_column_with_labels_for_single_slice(fsg, unsliced_traj, pathlet_mother[j], this->distance_threshold, j,slice);
+                //}
+                if(j < num_col -1){
+
+                    fsg.new_column();
+
+                }
+            }
+
+            return;
+
+
+        }
+
+        void populate_all_columns_with_labels_for_single_slice(free_space_graph_t& fsg, trajectory_t& unsliced_traj, subtrajectory_t& slice, trajectory_t& pathlet_mother,pathlet_matrix_t& pathlet_tree){
 
             int num_col = pathlet_mother.get_actual_size();
             
