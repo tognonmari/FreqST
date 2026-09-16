@@ -2059,7 +2059,7 @@ class frequent_subtrajectory_algo{
                         }
                         if(detailed_outcome){
 
-                            num_skipped_pathlets += num_spared_pathlets(pathlet_tree);
+                            num_skipped_pathlets += get_spared_pathlets(pathlet_tree);
                         }
 
                     }
