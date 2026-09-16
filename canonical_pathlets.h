@@ -793,7 +793,162 @@ class LightWeightBinaryPathletTree{
 
         
 };
+template<metric_space m_space>
+class PathletMatrix{
+    
+    public:
+        using space = m_space;
+        using index_t = std::size_t;
+        using trajectory_t = trajectory_collection<space>;
+        using subtrajectory_t = trajectory_t::subtrajectory_t;
+        using cluster_t = std::vector<subtrajectory_t>;
+        using id_t = trajectory_t::id_t;
+        using PathletNode = frechet::PathletNode<space>;
 
+    public:
+        PathletMatrix(){
+            
+        }
+        
+        PathletMatrix(trajectory_t& supp, id_t traj_id, int max_depth, int min_length){
+            this->support = supp;
+            this-> n = support.get_trajectory_size(traj_id);
+            this-> l = min_length;
+            this-> d = max_depth;
+            this->trajectory_id = traj_id;
+            //assert(min_length <= n);
+
+            assert(this->pathlet_collection.empty()); //assert flat_tree is empty
+
+            this->build(); //Fills the pathlet_collection vector, which is then explored as a binary tree
+        }
+
+        //Getters
+        //inline int getDepth() { return this-> d;}
+        inline int getMinLength() { return this-> l; }
+        inline int getTrajectoryLength() {return this-> n;}
+        //inline int getPathletCollectionLength(){return this->pathlet_collection.size();}
+        id_t getTrajectoryId(){ return this->trajectory_id; }
+
+        //Setters
+        void setInfrequent(int node_idx) {
+            
+            PathletNode& p = this-> pathlet_collection.at(node_idx);
+            p.frequent = false;
+            assert(p.frequent == this-> pathlet_collection.at(node_idx).isFrequent());
+            int father = node_idx;
+            while (father > 0) {
+                
+                father = get_father(father);
+                PathletNode& ap = this-> pathlet_collection.at(father);
+                if (!ap.frequent){ break; }
+                ap.frequent = false;
+            }
+            //bottom-up visit of the tree, only where needed
+        }
+
+        void setEstimatedFrequency(int x, int y, float freq){
+
+            pathlet_collection[y][x].frequency = freq;
+
+
+        }
+        
+        PathletNode& getNodeAt(int x, int y){
+
+            
+            return pathlet_collection[y][x]; //Should be returning without the id set 
+
+        }
+
+        
+        std::string toString(){
+            
+            std::string s = "Binary matrix : ID "+ std::to_string(this->trajectory_id)+ "\n";
+            for (int i=0; i< pathlet_collection.size(); i++){
+                PathletNode p = pathlet_collection.at(i);
+                if (p.isNULL){
+                    s += std::format("Node {} Pathlet: NULL ", i);
+                }
+                else{
+                    s += std::format("Node {} Pathlet: [ {}, {}]", i, p.getPathlet().first, p.getPathlet().second);
+                }
+                
+                s += "\n";
+            }
+            s += "\n";
+            return s;
+        }
+
+        static inline int left_child_idx(int node_idx){
+
+            return 2 * node_idx + 1;
+
+        }
+
+        static inline int right_child_idx(int node_idx){
+
+            return 2* node_idx + 2;
+
+        }
+
+        private: 
+
+        std::vector<std::vector<PathletNode>> pathlet_collection; 
+        int n;
+        int d;
+        int l;
+        trajectory_t support;
+        id_t trajectory_id;
+
+        static inline int get_father(int node_idx){
+
+            assert(node_idx > 0);
+
+            int father =  (node_idx % 2 ) ? (node_idx - 1) / 2 : (node_idx - 2) / 2; 
+
+            return father;
+        }
+        
+        void build(){
+
+            //Root is the first node of vector pathlet_collection
+            PathletNode root(0, this-> n - 1);
+           
+            int level_beginning = 1;
+            //fill up first row
+            for (int j=0; j<=this->n -1; j++){
+                PathletNode pn(0,j);
+                //Allocate the column vector-> already reserve the necessary space since you know how many are there
+                this->pathlet_collection.push_back(std::vector<PathletNode>{});
+                this->pathlet_collection.back().reserve(j);
+                this->pathlet_collection.back().push_back(pn);
+
+            }
+
+            // fill up row from 1 to n-1
+
+            for (int i = 1; i<=this->n-1; i++){
+
+                for (int j=i; j<=this->n-1; j++){
+
+                    this->pathlet_collection[j].push_back(PathletNode(i,j));
+
+                }
+
+            }
+
+            assert(this->pathlet_collection.size() == this->n);
+            assert(this->pathlet_collection[this->n-1].size() == this->n);
+
+            //ASSERTIONS FOR TOY DS
+            //assert(pathlet_collection.at(1).getPathlet().first == 0);
+            //std::cout << "This is the second extreme of the 1st node of the second levedl (idx = 1)"<< pathlet_collection.at(1).getPathlet().second<< std::endl;
+        }
+        
+
+        
+};
 
 
 }
